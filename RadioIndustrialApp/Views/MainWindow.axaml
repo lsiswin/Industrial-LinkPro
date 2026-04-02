@@ -6,6 +6,7 @@
         mc:Ignorable="d" d:DesignWidth="1280" d:DesignHeight="768"
         x:Class="RadioIndustrialApp.Views.MainWindow"
         x:DataType="vm:MainWindowViewModel"
+        xmlns:prism="http://prismlibrary.com/"
         MinWidth="1200" MinHeight="700"
         Icon="/Assets/avalonia-logo.ico"
         Title="RadioIndustrialApp">
@@ -106,25 +107,23 @@
                     <TextBlock Text="工业数据采集与监控系统" Foreground="#60A5FA" Margin="5,5,0,0"/>
                 </StackPanel>
             </StackPanel>
-            <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Stretch" HorizontalAlignment="Center">
-                <RadioButton Content="首页仪表盘" 
-                             Tag="📊" 
-                             Classes="nav-button" 
-                             IsChecked="True"/>
-                 
-                <RadioButton Content="设备与标签" 
-                             Tag="📦" 
-                             Classes="nav-button"/>
-                <RadioButton Content="数据分析" 
-                             Tag="📈" 
-                             Classes="nav-button"/>
-                <RadioButton Classes="nav-button"
-                             Tag="⚠️"
-                             Content="报警记录"/>
-                <RadioButton Content="系统设置" 
-                             Tag="⚙️" 
-                             Classes="nav-button"/>
-            </StackPanel>
+            <ItemsControl ItemsSource="{Binding NavItems}" Grid.Column="1">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center"/>
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+    
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:NavItem">
+                        <RadioButton Content="{Binding Title}" 
+                                     Tag="{Binding Icon}" 
+                                     Command="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).NavigateCommand}"
+                                     CommandParameter="{Binding Target}"
+                                     Classes="nav-button"
+                                     GroupName="MainNavbar"/> </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
             <StackPanel Grid.Column="2" Orientation="Horizontal">
                 <StackPanel Margin="10,0" VerticalAlignment="Center">
                     <TextBlock Text="2026年03月31日 14:30:22" Foreground="#94A3B8"></TextBlock>
@@ -157,5 +156,15 @@
             </StackPanel>
         </Grid>
         </Border>
+        <ContentControl Grid.Row="1" prism:RegionManager.RegionName="MainRegion"></ContentControl>
+        <Border Grid.Row="2" Background="#1E293B" BorderThickness="0,3,0,0" BorderBrush="#1E3AB1">
+            <TextBlock Text="© 2026 RadioIndustrialApp. All rights reserved." 
+                    Foreground="#94A3B8" 
+                    FontSize="12" 
+                    HorizontalAlignment="Center" 
+                    VerticalAlignment="Center" 
+                    Margin="0,5"/>
+        </Border>
+        
     </Grid>
 </Window>
