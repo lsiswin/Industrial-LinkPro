@@ -12,17 +12,23 @@ public partial class MainWindowViewModel : ViewModelBase
     public MainWindowViewModel(IRegionManager regionManager)
     {
         _regionManager = regionManager;
+        
     }
-
     #region navigate
     public ObservableCollection<NavItem> NavItems { get; } = new()
     {
-        new NavItem { Title = "首页仪表盘", Icon = "📊", Target = "IndexView" },
+        new NavItem { Title = "首页仪表盘", Icon = "📊", Target = "IndexView" ,IsSelected = true},
         new NavItem { Title = "设备与标签", Icon = "📦", Target = "DeviceView" },
         new NavItem { Title = "数据分析", Icon = "📈", Target = "AnalysisView" },
         new NavItem { Title = "报警记录", Icon = "⚠️", Target = "AlarmsView" },
         new NavItem { Title = "系统设置", Icon = "⚙️", Target = "SettingView" }
     };
+
+    [RelayCommand]
+    public void Load()
+    {
+        Navigate("IndexView");
+    }
     
     [RelayCommand]
     public void Navigate(string? viewName)
@@ -45,4 +51,5 @@ public class NavItem
     public string Title { get; set; }
     public string Icon { get; set; }
     public string Target { get; set; }
+    public bool? IsSelected { get; set; }
 }

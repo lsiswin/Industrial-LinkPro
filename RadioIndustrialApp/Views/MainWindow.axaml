@@ -6,14 +6,9 @@
         mc:Ignorable="d" d:DesignWidth="1280" d:DesignHeight="768"
         x:Class="RadioIndustrialApp.Views.MainWindow"
         x:DataType="vm:MainWindowViewModel"
+        prism:ViewModelLocator.AutoWireViewModel="True"
         xmlns:prism="http://prismlibrary.com/"
-        MinWidth="1200" MinHeight="700"
-        Icon="/Assets/avalonia-logo.ico"
-        Title="RadioIndustrialApp">
-
-    <Design.DataContext>
-        <vm:MainWindowViewModel/>
-    </Design.DataContext>
+        MinWidth="1200" MinHeight="700">
     <Window.Styles>
         <Style Selector="RadioButton.nav-button">
             <Setter Property="Background" Value="Transparent"/>
@@ -93,9 +88,13 @@
             <Setter Property="Fill" Value="#EF4444"/>
         </Style>
     </Window.Styles>
-    
-    <Grid RowDefinitions="Auto,*,Auto" Background="Azure">
-        <Border BorderThickness="0,0,0,3" BorderBrush="#1E3AB1" Background="#1E293B" >
+    <Interaction.Behaviors>
+        <EventTriggerBehavior EventName="Loaded">
+            <InvokeCommandAction Command="{Binding LoadCommand}" />
+        </EventTriggerBehavior>
+    </Interaction.Behaviors>
+    <Grid RowDefinitions="Auto,*,Auto" Background="#020617">
+        <Border BorderThickness="0,0,0,1" BorderBrush="#1E3A8A" Background="#1E293B" >
         <Grid ColumnDefinitions="Auto,*,Auto">
             <StackPanel Orientation="Horizontal" Margin="0,0,0,10" >
                 <TextBlock Text="♓" FontSize="40" Margin="10,10,0,0"/>
@@ -116,12 +115,15 @@
     
                 <ItemsControl.ItemTemplate>
                     <DataTemplate x:DataType="vm:NavItem">
-                        <RadioButton Content="{Binding Title}" 
+                        <RadioButton Content="{Binding Title}"
                                      Tag="{Binding Icon}" 
+                                     IsChecked="{Binding IsSelected, Mode=TwoWay}"
                                      Command="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).NavigateCommand}"
                                      CommandParameter="{Binding Target}"
                                      Classes="nav-button"
-                                     GroupName="MainNavbar"/> </DataTemplate>
+                                     GroupName="MainNavbar">
+                        </RadioButton>
+                    </DataTemplate>
                 </ItemsControl.ItemTemplate>
             </ItemsControl>
             <StackPanel Grid.Column="2" Orientation="Horizontal">
