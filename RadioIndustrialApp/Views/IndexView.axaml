@@ -1,185 +1,193 @@
-﻿<UserControl xmlns="https://github.com/avaloniaui"
+<UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-             mc:Ignorable="d" d:DesignWidth="1280" d:DesignHeight="768"
+             mc:Ignorable="d" d:DesignWidth="1400" d:DesignHeight="900"
              xmlns:vm="clr-namespace:RadioIndustrialApp.ViewModels"
              x:DataType="vm:IndexViewModel"
              xmlns:lvc="clr-namespace:LiveChartsCore.SkiaSharpView.Avalonia;assembly=LiveChartsCore.SkiaSharpView.Avalonia"
-             d:DataContext="{d:DesignInstance vm:IndexViewModel}"
-             mvvm:ViewModelLocator.AutoWireViewModel="True"
-             xmlns:models="clr-namespace:RadioIndustrialApp.Models"
-             xmlns:mvvm="http://prismlibrary.com/"
-             xmlns:converters="clr-namespace:RadioIndustrialApp.Converters"
              x:Class="RadioIndustrialApp.Views.IndexView">
-    <UserControl.Resources>
-        <converters:StatusToBoolConverter x:Key="StatusToBoolConverter"/>
-    </UserControl.Resources>
+
     <UserControl.Styles>
-        <Style Selector="Button.tab-btn">
-            <Setter Property="Background" Value="Transparent"/>
-            <Setter Property="BorderBrush" Value="#2D3142"/>
-            <Setter Property="Foreground" Value="#8B8E99"/>
-            <Setter Property="Padding" Value="12,5"/>
-        </Style>
-        <Style Selector="Button.tab-btn-active">
-            <Setter Property="Background" Value="#1E2A4A"/>
-            <Setter Property="BorderBrush" Value="#409EFF"/>
-            <Setter Property="Foreground" Value="#409EFF"/>
-            <Setter Property="Padding" Value="12,5"/>
+        <Style Selector="Border.card">
+            <Setter Property="Background" Value="#111827"/> <Setter Property="CornerRadius" Value="8"/>
+            <Setter Property="BorderBrush" Value="#1F2937"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding" Value="20"/>
+            <Setter Property="BoxShadow" Value="0 4 6 0 #0A0A0A"/>
         </Style>
         
-        <Style Selector="Border.card">
-            <Setter Property="Background" Value="#1E293B"/>
-            <Setter Property="CornerRadius" Value="8"/>
-            <Setter Property="Padding" Value="12"/>
-            <Setter Property="BorderBrush" Value="#3B82F6"/>
-            <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="Height" Value="150"></Setter>
-            <Setter Property="Margin" Value="10,20,10,20"></Setter>
+        <Style Selector="Button.primary">
+            <Setter Property="Background" Value="#2563EB"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="CornerRadius" Value="4"/>
+            <Setter Property="Padding" Value="16,8"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Transitions">
+                <Transitions>
+                    <BrushTransition Property="Background" Duration="0:0:0.2"/>
+                </Transitions>
+            </Setter>
         </Style>
-        <Style Selector="TextBlock.error">
-            <Setter Property="Foreground" Value="#F44336"/>
+        <Style Selector="Button.primary:pointerover">
+            <Setter Property="Background" Value="#3B82F6"/>
         </Style>
     </UserControl.Styles>
-    <Grid RowDefinitions="Auto,*">
-        <ItemsControl ItemsSource="{Binding DashboardCards}" Margin="20">
-        <ItemsControl.ItemsPanel>
-            <ItemsPanelTemplate>
-                <UniformGrid Columns="4" Rows="1"/>
-            </ItemsPanelTemplate>
-        </ItemsControl.ItemsPanel>
-        <ItemsControl.ItemTemplate>
-            <DataTemplate x:DataType="models:DashboardCardModel">
-                <Border Margin="10" Padding="20" CornerRadius="12"
-                        Background="#1A1C2E" BorderBrush="#2D3142" BorderThickness="1.5">
-                    <Border.BoxShadow>
-                        <BoxShadows>0 6 12 0 #50000000</BoxShadows>
-                    </Border.BoxShadow>
 
-                    <Grid RowDefinitions="Auto, *, Auto">
-                        <Grid ColumnDefinitions="*, Auto">
-                            <TextBlock Text="{Binding Title}" Foreground="#8B8E99" FontSize="13" FontWeight="SemiBold"/>
-                            <Border Grid.Column="1" Padding="8" CornerRadius="8" Background="#111322">
-                                <PathIcon Data="{Binding IconData}" Foreground="{Binding AccentColor}"  Width="20" Height="20"/>
-                            </Border>
-                        </Grid>
+    <Grid Background="#030712" RowDefinitions="Auto,Auto,*" Margin="24">
+        
+        <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Margin="0,0,0,24">
+            <StackPanel>
+                <TextBlock Text="ColdDream 工业互联与数据中心" Foreground="White" FontSize="28" FontWeight="Bold" LetterSpacing="1"/>
+                <TextBlock Text="OPC UA / PLC / Robot / Vision 统一监控调度平台" Foreground="#38BDF8" FontSize="14" Margin="0,6,0,0" Opacity="0.8"/>
+            </StackPanel>
+            
+            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="16" VerticalAlignment="Center">
+                <Border Background="#1E293B" CornerRadius="20" Padding="12,6">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <TextBlock Text="●" Foreground="{Binding SystemStatus, Converter={x:Static ObjectConverters.IsNotNull}}" /> <TextBlock Text="{Binding SystemStatus}" Foreground="#94A3B8" FontSize="13"/>
+                    </StackPanel>
+                </Border>
+                <TextBlock Text="{Binding LastUpdateTime}" Foreground="#64748B" FontSize="14" VerticalAlignment="Center"/>
+                <Button Content="刷新大屏" Command="{Binding RefreshDevicesCommand}" Classes="primary" Padding="12,6" FontSize="12"/>
+            </StackPanel>
+        </Grid>
 
-                        <StackPanel Grid.Row="1" VerticalAlignment="Center" Margin="0,0,0,10">
-                            <TextBlock Text="{Binding Value}" 
-                                       Foreground="{Binding AccentColor}" 
-                                       FontSize="30" FontWeight="Heavy"/>
+        <UniformGrid Grid.Row="1" Columns="4" Margin="0,0,0,24">
+            <Border Classes="card" Margin="0,0,12,0">
+                <StackPanel>
+                    <TextBlock Text="设备连接总览" Foreground="#94A3B8" FontSize="14"/>
+                    <Grid ColumnDefinitions="*,*,*" Margin="0,16,0,0">
+                        <StackPanel>
+                            <TextBlock Text="{Binding TotalDevices}" Foreground="White" FontSize="32" FontWeight="Bold"/>
+                            <TextBlock Text="Total" Foreground="#64748B" FontSize="12"/>
                         </StackPanel>
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="{Binding OnlineDevices}" Foreground="#10B981" FontSize="32" FontWeight="Bold"/>
+                            <TextBlock Text="Online" Foreground="#64748B" FontSize="12"/>
+                        </StackPanel>
+                        <StackPanel Grid.Column="2">
+                            <TextBlock Text="{Binding ErrorDevices}" Foreground="#EF4444" FontSize="32" FontWeight="Bold"/>
+                            <TextBlock Text="Error" Foreground="#64748B" FontSize="12"/>
+                        </StackPanel>
+                    </Grid>
+                </StackPanel>
+            </Border>
 
-                        <ContentControl Grid.Row="2" Content="{Binding FooterContent}">
-                            <ContentControl.DataTemplates>
-                                
-                                <DataTemplate DataType="models:OpcCommMetric">
-                                    <StackPanel Orientation="Horizontal" Spacing="12">
-                                        <TextBlock Text="{Binding Endpoint}" Foreground="#5C5E66" FontSize="11"/>
-                                        <TextBlock Text="{Binding Latency}" Foreground="#4CAF50" FontSize="11" FontWeight="Bold"/>
-                                    </StackPanel>
-                                </DataTemplate>
+            <Border Classes="card" Margin="6,0,6,0">
+                <StackPanel>
+                    <TextBlock Text="OPC UA 引擎状态" Foreground="#94A3B8" FontSize="14"/>
+                    <Grid ColumnDefinitions="*,Auto" Margin="0,16,0,0">
+                        <StackPanel>
+                            <TextBlock Text="{Binding OpcNodeCount}" Foreground="#38BDF8" FontSize="32" FontWeight="Bold"/>
+                            <TextBlock Text="Active Nodes" Foreground="#64748B" FontSize="12"/>
+                        </StackPanel>
+                        <StackPanel Grid.Column="1" VerticalAlignment="Bottom" HorizontalAlignment="Right">
+                            <TextBlock Text="{Binding ConnectedClients, StringFormat='{}Clients: {0}'}" Foreground="#94A3B8" FontSize="12"/>
+                        </StackPanel>
+                    </Grid>
+                </StackPanel>
+            </Border>
 
-                                <DataTemplate DataType="models:DataEngineLoad">
-                                    <StackPanel Spacing="5">
-                                        <ProgressBar Value="{Binding CpuUsage}" Height="3" CornerRadius="2"
-                                                     Foreground="#2196F3" Background="#2D3142"/>
-                                        <TextBlock Text="{Binding TotalNodes, StringFormat='点位总数: {0}'}" 
-                                                   Foreground="#5C5E66" FontSize="10" HorizontalAlignment="Right"/>
-                                    </StackPanel>
-                                </DataTemplate>
+            <Border Classes="card" Margin="6,0,6,0">
+                <StackPanel>
+                    <TextBlock Text="底层数据吞吐速率" Foreground="#94A3B8" FontSize="14"/>
+                    <Grid ColumnDefinitions="*,Auto" Margin="0,16,0,0">
+                        <StackPanel>
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Bottom">
+                                <TextBlock Text="{Binding DataThroughput}" Foreground="#A855F7" FontSize="32" FontWeight="Bold"/>
+                                <TextBlock Text=" 次/秒" Foreground="#64748B" FontSize="14" Margin="4,0,0,6" VerticalAlignment="Bottom"/>
+                            </StackPanel>
+                            <TextBlock Text="Redis / 时序数据库缓存" Foreground="#64748B" FontSize="12"/>
+                        </StackPanel>
+                    </Grid>
+                </StackPanel>
+            </Border>
 
-                                <DataTemplate DataType="models:ActiveAlarm">
-                                    <Border Background="#2A1A1F" Padding="8,5" CornerRadius="4">
-                                        <Grid ColumnDefinitions="Auto, *">
-                                            <Border Width="3" Background="#F44336" CornerRadius="2" Margin="0,0,8,0"/>
-                                            <TextBlock Grid.Column="1" Text="{Binding Message}" 
-                                                       Foreground="#DCDFE6" FontSize="11" TextTrimming="CharacterEllipsis"/>
+            <Border Classes="card" Margin="12,0,0,0">
+                <StackPanel>
+                    <TextBlock Text="时序数据入库量" Foreground="#94A3B8" FontSize="14"/>
+                    <Grid ColumnDefinitions="*,Auto" Margin="0,16,0,0">
+                        <StackPanel>
+                            <TextBlock Text="{Binding PersistedDataCount, StringFormat='{}{0:N0}'}" Foreground="White" FontSize="32" FontWeight="Bold"/>
+                            <TextBlock Text="PostgreSQL 记录总数" Foreground="#64748B" FontSize="12"/>
+                        </StackPanel>
+                    </Grid>
+                </StackPanel>
+            </Border>
+        </UniformGrid>
+
+        <Grid Grid.Row="2" ColumnDefinitions="4*,3*">
+            
+            <Border Classes="card" Grid.Column="0" Margin="0,0,12,0">
+                <Grid RowDefinitions="Auto,*">
+                    <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,16">
+                        <TextBlock Text="现场设备接入拓扑" Foreground="White" FontSize="18" FontWeight="SemiBold"/>
+                        <Button Grid.Column="1" Content="一键重连异常节点" Command="{Binding ConnectAllDevicesCommand}" Classes="primary" Padding="12,6" FontSize="12"/>
+                    </Grid>
+                    
+                    <ScrollViewer Grid.Row="1">
+                        <ItemsControl ItemsSource="{Binding Devices}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Border Background="#1E293B" CornerRadius="6" Padding="16" Margin="0,0,0,10" BorderBrush="#334155" BorderThickness="1">
+                                        <Grid ColumnDefinitions="Auto,*,120,80">
+                                            <Border Width="40" Height="40" CornerRadius="20" Background="#0F172A" VerticalAlignment="Center" Margin="0,0,16,0">
+                                                <TextBlock Text="{Binding StatusIcon}" Foreground="{Binding StatusColor}" FontSize="18" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                            </Border>
+                                            
+                                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                                <TextBlock Text="{Binding Name}" Foreground="White" FontSize="16" FontWeight="SemiBold"/>
+                                                <TextBlock Text="{Binding Detail}" Foreground="#94A3B8" FontSize="12" Margin="0,4,0,0"/>
+                                            </StackPanel>
+                                            
+                                            <StackPanel Grid.Column="2" VerticalAlignment="Center">
+                                                <TextBlock Text="{Binding IpAddress}" Foreground="#E2E8F0" FontSize="13" FontFamily="Consolas"/>
+                                                <TextBlock Text="{Binding Protocol}" Foreground="#38BDF8" FontSize="11" Margin="0,4,0,0"/>
+                                            </StackPanel>
+                                            
+                                            <Border Grid.Column="3" Background="#0F172A" BorderBrush="{Binding StatusColor}" BorderThickness="1" CornerRadius="4" Padding="0,4" VerticalAlignment="Center">
+                                                <TextBlock Text="{Binding Status}" Foreground="{Binding StatusColor}" FontSize="12" FontWeight="Bold" HorizontalAlignment="Center"/>
+                                            </Border>
                                         </Grid>
                                     </Border>
                                 </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
+                </Grid>
+            </Border>
 
-                                <DataTemplate DataType="models:ProductionMetric">
-                                    <Grid ColumnDefinitions="*, *">
-                                        <TextBlock Text="{Binding Count, StringFormat='Total: {0}'}" Foreground="#8B8E99" FontSize="11"/>
-                                        <TextBlock Grid.Column="1" Text="{Binding CycleTime, StringFormat='CT: {0}ms'}" 
-                                                   Foreground="#00BCD4" FontSize="11" HorizontalAlignment="Right"/>
-                                    </Grid>
-                                </DataTemplate>
-
-                            </ContentControl.DataTemplates>
-                        </ContentControl>
+            <Grid Grid.Column="1" RowDefinitions="Auto,*" Margin="12,0,0,0">
+                
+                <Border Classes="card" Grid.Row="0" Margin="0,0,0,24" Height="250">
+                    <Grid RowDefinitions="Auto,*">
+                        <TextBlock Text="实时采集性能监控" Foreground="White" FontSize="16" FontWeight="SemiBold" Margin="0,0,0,10"/>
+                        <lvc:CartesianChart Grid.Row="1" Series="{Binding ChartSeries}" XAxes="{Binding XAxes}" YAxes="{Binding YAxes}" TooltipPosition="Hidden" />
                     </Grid>
                 </Border>
-            </DataTemplate>
-        </ItemsControl.ItemTemplate>
-    </ItemsControl>
-        <Grid Grid.Row="1" ColumnDefinitions="*, 450" Margin="20">
-        
-        <Border Grid.Column="0" Margin="0,0,15,0" Padding="25" Background="#16192C" CornerRadius="8" BorderBrush="#2D3142" BorderThickness="1">
-            <Grid RowDefinitions="Auto, *">
-                <Grid ColumnDefinitions="*, Auto">
-                    <StackPanel>
-                        <TextBlock Text="系统数据采集负载趋势" Foreground="White" FontSize="18" FontWeight="Bold"/>
-                        <TextBlock Text="采集引擎多线程性能实时监控" Foreground="#606266" FontSize="12" Margin="0,5,0,0"/>
-                    </StackPanel>
-                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="10">
-                        <Button Content="CPU负载" Classes="tab-btn-active"/>
-                        <Button Content="内存占用" Classes="tab-btn"/>
-                    </StackPanel>
-                </Grid>
                 
-                <lvc:CartesianChart Grid.Row="1" Margin="0,30,0,0"
-                                    Series="{Binding Series}"
-                                    XAxes="{Binding XAxes}"
-                                    YAxes="{Binding YAxes}" />
+                <Border Classes="card" Grid.Row="1">
+                    <Grid RowDefinitions="Auto,*">
+                        <TextBlock Text="系统实时事件日志" Foreground="White" FontSize="16" FontWeight="SemiBold" Margin="0,0,0,16"/>
+                        
+                        <ScrollViewer Grid.Row="1">
+                            <ItemsControl ItemsSource="{Binding SystemLogs}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Grid ColumnDefinitions="Auto,Auto,*" Margin="0,0,0,10">
+                                            <TextBlock Text="{Binding Time}" Foreground="#64748B" FontSize="12" FontFamily="Consolas" VerticalAlignment="Top" Width="70"/>
+                                            <TextBlock Grid.Column="1" Text="{Binding Level}" Foreground="{Binding LevelColor}" FontSize="12" FontWeight="Bold" Width="60" Margin="10,0" VerticalAlignment="Top"/>
+                                            <TextBlock Grid.Column="2" Text="{Binding Message}" Foreground="#E2E8F0" FontSize="12" TextWrapping="Wrap"/>
+                                        </Grid>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </ScrollViewer>
+                    </Grid>
+                </Border>
             </Grid>
-        </Border>
 
-        <Border Grid.Column="1" Padding="25"
-                Background="#16192C" CornerRadius="8" BorderBrush="#2D3142" BorderThickness="1">
-            <DockPanel>
-                <Grid DockPanel.Dock="Top" ColumnDefinitions="*, Auto" Margin="0,0,0,20">
-                    <TextBlock Text="PLC 设备快照" Foreground="White" FontSize="18" FontWeight="Bold"/>
-                    <TextBlock Grid.Column="1" Text="查看详情" Foreground="#409EFF" VerticalAlignment="Center" Cursor="Hand"/>
-                </Grid>
-
-                <ItemsControl ItemsSource="{Binding Devices}">
-                    <ItemsControl.ItemTemplate>
-                        <DataTemplate>
-                            <Border Margin="0,0,0,12" Padding="15" CornerRadius="6"
-                                    Background="#1A1C2E" BorderBrush="#2D3142" BorderThickness="1">
-                                <Grid ColumnDefinitions="Auto, *, Auto">
-                                    <Panel>
-                                        <Border Width="45" Height="45" Background="#25283D" CornerRadius="4">
-                                            <PathIcon Data="M2,2H22V22H2M4,4V20H20V4H4M6,6H18V10H6V6" Width="20" Foreground="#8B8E99"/>
-                                        </Border>
-                                        <Ellipse Width="8" Height="8" Fill="{Binding StatusColor}" 
-                                                 HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,-3,-3,0"/>
-                                    </Panel>
-
-                                    <StackPanel Grid.Column="1" Margin="15,0">
-                                        <TextBlock Text="{Binding Name}" Foreground="White" FontWeight="SemiBold"
-                                                   FontSize="14" Classes.error="{Binding Status, Converter={StaticResource StatusToBoolConverter}, ConverterParameter=ERROR}"/>
-                                        <TextBlock Foreground="#606266" FontSize="11" Margin="0,4,0,0">
-                                            <Run Text="IP: "/> <Run Text="{Binding IpAddress}"/>
-                                            <Run Text=" | "/> <Run Text="{Binding Detail}"/>
-                                        </TextBlock>
-                                    </StackPanel>
-
-                                    <Border Grid.Column="2" Padding="8,3" CornerRadius="4" Height="24"
-                                            Background="#111322" BorderBrush="{Binding StatusColor}" BorderThickness="0.5">
-                                        <TextBlock Text="{Binding Status}" Foreground="{Binding StatusColor}" 
-                                                   FontSize="10" FontWeight="Bold" VerticalAlignment="Center"/>
-                                    </Border>
-                                </Grid>
-                            </Border>
-                        </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                </ItemsControl>
-            </DockPanel>
-        </Border>
-    </Grid>
+        </Grid>
     </Grid>
 </UserControl>

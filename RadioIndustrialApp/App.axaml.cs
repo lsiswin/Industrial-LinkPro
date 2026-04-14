@@ -1,8 +1,9 @@
 using System;
+using System.Linq;
 using Avalonia;
 using Avalonia.Data.Core.Plugins;
-using System.Linq;
 using Avalonia.Markup.Xaml;
+using Microsoft.Extensions.Configuration;
 using Prism.DryIoc;
 using Prism.Ioc;
 using RadioIndustrialApp.ViewModels;
@@ -27,32 +28,19 @@ public partial class App : PrismApplication
 
     protected override void RegisterTypes(IContainerRegistry containerRegistry)
     {
-        containerRegistry.RegisterForNavigation<DeviceView,DeviceViewModel>();
-        containerRegistry.RegisterForNavigation<AnalysisView,AnalysisViewModel>();
-        containerRegistry.RegisterForNavigation<SettingView,SettingViewModel>();
-        containerRegistry.RegisterForNavigation<AlarmsView,AlarmsViewModel>();
-        containerRegistry.RegisterForNavigation<IndexView,IndexViewModel>();
+        // 加载 appsettings.json
+        var config = new ConfigurationBuilder()
+            .SetBasePath(AppContext.BaseDirectory)
+            .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
+            .Build();
+        // 注册 IConfiguration 实例
+        containerRegistry.RegisterInstance<IConfiguration>(config);
+
+        containerRegistry.RegisterForNavigation<DeviceView, DeviceViewModel>();
+        containerRegistry.RegisterForNavigation<AnalysisView, AnalysisViewModel>();
+        containerRegistry.RegisterForNavigation<SettingView, SettingViewModel>();
+        containerRegistry.RegisterForNavigation<AlarmsView, AlarmsViewModel>();
+        containerRegistry.RegisterForNavigation<IndexView, IndexViewModel>();
+
     }
-
-
-    public override void OnFrameworkInitializationCompleted()
-    {
-        base.OnFrameworkInitializationCompleted();
-        DisableAvaloniaDataAnnotationValidation();
-
-        
-    }
-    private void DisableAvaloniaDataAnnotationValidation()
-    {
-        
-        var dataValidationPluginsToRemove =
-            BindingPlugins.DataValidators.OfType<DataAnnotationsValidationPlugin>().ToArray();
-
-        foreach (var plugin in dataValidationPluginsToRemove)
-        {
-            BindingPlugins.DataValidators.Remove(plugin);
-        }
-    }
-    
-    
 }

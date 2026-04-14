@@ -1,105 +1,186 @@
-﻿using System.Collections.ObjectModel;
+using System;
+using System.Collections.ObjectModel;
+using System.Linq;
+using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using LiveChartsCore;
 using LiveChartsCore.SkiaSharpView;
 using LiveChartsCore.SkiaSharpView.Painting;
-using Prism.Commands;
-using RadioIndustrialApp.Models;
 using SkiaSharp;
+using Prism.Events;
+using Microsoft.Extensions.Configuration;
 
 namespace RadioIndustrialApp.ViewModels;
 
-public partial class IndexViewModel:ViewModelBase
+public partial class IndexViewModel : ViewModelBase
 {
-    // 图表数据
-    public ISeries[] Series { get; set; }
-    public Axis[] XAxes { get; set; }
-    public Axis[] YAxes { get; set; }
+    private readonly IConfiguration _configuration;
+    private readonly IEventAggregator _aggregator;
 
-    // 设备列表
-    public ObservableCollection<DeviceItem> Devices { get; set; }
-        public ObservableCollection<DashboardCardModel> DashboardCards { get; set; }
+    // ========== 数据集合 ==========
+    public ObservableCollection<DeviceItem> Devices { get; set; } = new();
+    public ObservableCollection<SystemLogItem> SystemLogs { get; set; } = new();
+
+    // ========== 图表属性 ==========
+    [ObservableProperty]
+    private ISeries[] chartSeries;
+
+    [ObservableProperty]
+    private Axis[] xAxes;
+
+    [ObservableProperty]
+    private Axis[] yAxes;
+
+    // ========== 顶部统计指标 ==========
+    [ObservableProperty] private int _totalDevices = 0;
+    [ObservableProperty] private int _onlineDevices = 0;
+    [ObservableProperty] private int _errorDevices = 0;
+    
+    [ObservableProperty] private int _opcNodeCount = 2458;
+    [ObservableProperty] private int _connectedClients = 4;
+    [ObservableProperty] private string _opcServiceStatus = "Active";
+    
+    [ObservableProperty] private long _persistedDataCount = 3845012;
+    [ObservableProperty] private int _dataThroughput = 1250; // 条/秒
+
+    [ObservableProperty] private string _systemStatus = "系统运行正常";
+    [ObservableProperty] private string _lastUpdateTime;
+
+    public IndexViewModel(IConfiguration configuration, IEventAggregator aggregator)
+    {
+        _configuration = configuration;
+        _aggregator = aggregator;
         
-
-        public IndexViewModel()
-        {
-            DashboardCards = new ObservableCollection<DashboardCardModel>();
-            Load();
-        }
-
+        LastUpdateTime = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
         
-        private void Load()
-        {
-            DashboardCards.Clear();
-
-            // 1. 西门子 S7-1500 连接状态
-            DashboardCards.Add(new DashboardCardModel {
-                Title = "OPC UA 控制器链路",
-                Value = "ONLINE",
-                AccentColor = "#4CAF50",
-                IconData = "M2,2H22V22H2M4,4V20H20V4H4M6,6H18V10H6V6M6,12H18V18H6V12Z", // 示例 PathData
-                FooterContent = new OpcCommMetric { Endpoint = "192.168.0.10", Status = true, Latency = "5ms" }
-            });
-
-            // 2. 数据处理引擎
-            DashboardCards.Add(new DashboardCardModel {
-                Title = "数据采集引擎",
-                Value = "2,450 Nodes",
-                AccentColor = "#2196F3",
-                IconData = "M12,6V18L18,12L12,6M7,6V18L13,12L7,6Z",
-                FooterContent = new DataEngineLoad { TotalNodes = 2450, SamplingRate = 10, CpuUsage = 15.4 }
-            });
-
-            // 3. 实时告警
-            DashboardCards.Add(new DashboardCardModel {
-                Title = "系统活动告警",
-                Value = "02 Active",
-                AccentColor = "#F44336",
-                IconData = "M13,14H11V9H13M13,18H11V16H13M1,21H23L12,2L1,21Z",
-                FooterContent = new ActiveAlarm { Level = "CRITICAL", Message = "西门子 PLC 握手超时", Time = "12:05:33" }
-            });
-
-            // 4. 生产良率 (结合你的视觉背景)
-            DashboardCards.Add(new DashboardCardModel {
-                Title = "生产工艺指标",
-                Value = "98.5 % OK",
-                AccentColor = "#00BCD4",
-                IconData = "M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2M12,4A8,8 0 0,1 20,12A8,8 0 0,1 12,20A8,8 0 0,1 4,12A8,8 0 0,1 12,4M11,7V13H13V7H11M11,15V17H13V15H11Z",
-                FooterContent = new ProductionMetric { YieldRate = 98.5, CycleTime = 1200, Count = 4500 }
-            });
-            // 1. 初始化图表 (简化版配置)
-            Series = new ISeries[] {
-                new LineSeries<double> { 
-                    Values = new double[] { 25, 30, 42, 38, 45, 40, 52, 55 }, 
-                    Stroke = new SolidColorPaint(SKColors.CornflowerBlue) { StrokeThickness = 3 },
-                    GeometrySize = 0, Fill = null, Name = "CPU负载" 
-                },
-                new LineSeries<double> { 
-                    Values = new double[] { 60, 62, 63, 64, 63, 66, 65, 65 }, 
-                    Stroke = new SolidColorPaint(SKColors.Cyan) { StrokeThickness = 3 },
-                    GeometrySize = 0, Fill = null, Name = "内存占用" 
-                }
-            };
-
-            // 2. 初始化设备快照
-            Devices = new ObservableCollection<DeviceItem> {
-                new() { Name = "Siemens S7-1500_01", IpAddress = "192.168.1.100", Detail = "Rack 0, Slot 1", Status = "RUN" },
-                new() { Name = "Siemens S7-1200_PACK", IpAddress = "192.168.1.112", Detail = "Rack 0, Slot 0", Status = "RUN" },
-                new() { Name = "Modbus_TCP_Gateway", IpAddress = "192.168.1.50", Detail = "连接超时", Status = "ERROR" },
-                new() { Name = "Assembly_Line_3", IpAddress = "192.168.1.120", Detail = "未配置", Status = "OFFLINE" }
-            };
-        }
+        InitializeChart();
+        LoadMockData();
     }
-public class DeviceItem : ObservableObject
+
+    [RelayCommand]
+    private async Task ConnectAllDevicesAsync()
+    {
+        SystemStatus = "正在初始化底层通讯链路...";
+        AddLog("Info", "开始批量连接工业现场设备...");
+        await Task.Delay(1000); // 模拟耗时
+        foreach (var device in Devices.Where(d => d.Status != "RUN"))
+        {
+            device.Status = "RUN";
+        }
+        UpdateStatistics();
+        SystemStatus = "所有设备已连接";
+        AddLog("Success", "底层通讯链路建立完成。");
+    }
+
+    [RelayCommand]
+    private void RefreshDevices()
+    {
+        LoadMockData();
+        LastUpdateTime = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
+        AddLog("Info", "仪表盘数据已手动刷新。");
+    }
+
+    private void LoadMockData()
+    {
+        Devices.Clear();
+        var mockDevices = new[]
+        {
+            new DeviceItem { Name = "Siemens S7-1500", IpAddress = "192.168.0.10", Detail = "主控 PLC / 产线A", Protocol = "S7 / OPC UA", Status = "RUN" },
+            new DeviceItem { Name = "ABB IRB 1200", IpAddress = "192.168.0.21", Detail = "上下料机器人", Protocol = "RobotStudio/OPC", Status = "RUN" },
+            new DeviceItem { Name = "HIKROBOT Camera", IpAddress = "192.168.0.35", Detail = "视觉缺陷检测", Protocol = "GigE / Halcon", Status = "RUN" },
+            new DeviceItem { Name = "冷链环境温湿度仪", IpAddress = "192.168.0.50", Detail = "环境监测节点", Protocol = "Modbus TCP", Status = "ERROR" },
+            new DeviceItem { Name = "OPC UA 边缘网关", IpAddress = "127.0.0.1", Detail = "本地数据汇聚中枢", Protocol = "OPC UA", Status = "RUN" }
+        };
+
+        foreach (var device in mockDevices) Devices.Add(device);
+        UpdateStatistics();
+
+        SystemLogs.Clear();
+        AddLog("Info", "ColdDream 工业大屏已启动。");
+        AddLog("Info", "OPC UA Server (Port: 4840) 监听中...");
+        AddLog("Warning", "检测到冷链环境温湿度仪 (192.168.0.50) 通讯超时。");
+    }
+
+    private void UpdateStatistics()
+    {
+        TotalDevices = Devices.Count;
+        OnlineDevices = Devices.Count(d => d.Status == "RUN");
+        ErrorDevices = Devices.Count(d => d.Status == "ERROR");
+    }
+
+    private void AddLog(string level, string message)
+    {
+        SystemLogs.Insert(0, new SystemLogItem 
+        { 
+            Time = DateTime.Now.ToString("HH:mm:ss"), 
+            Level = level, 
+            Message = message 
+        });
+        if (SystemLogs.Count > 50) SystemLogs.RemoveAt(SystemLogs.Count - 1);
+    }
+
+    private void InitializeChart()
+    {
+        ChartSeries = new ISeries[]
+        {
+            new LineSeries<double>
+            { 
+                Values = new double[] { 1200, 1250, 1180, 1300, 1250, 1400, 1350 }, 
+                Name = "数据采集吞吐量 (次/秒)",
+                Stroke = new SolidColorPaint(SKColors.Cyan) { StrokeThickness = 3 },
+                Fill = new LinearGradientPaint(new SKColor(0, 255, 255, 60), new SKColor(0, 255, 255, 0), SKPoint.Empty, new SKPoint(0, 1)),
+                GeometrySize = 8,
+                GeometryStroke = new SolidColorPaint(SKColors.Cyan) { StrokeThickness = 2 }
+            }
+        };
+
+        XAxes = new Axis[] { new Axis { Labels = new[] { "10:00", "10:05", "10:10", "10:15", "10:20", "10:25", "10:30" }, LabelsPaint = new SolidColorPaint(SKColors.LightGray) } };
+        YAxes = new Axis[] { new Axis { LabelsPaint = new SolidColorPaint(SKColors.LightGray) } };
+    }
+}
+
+public partial class DeviceItem : ObservableObject
 {
-    public string Name { get; set; }
-    public string IpAddress { get; set; }
-    public string Detail { get; set; }
-    public string Status { get; set; } // RUN, ERROR, OFFLINE
-    public string StatusColor => Status switch {
-        "RUN" => "#4CAF50",
-        "ERROR" => "#F44336",
-        _ => "#5C5E66"
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(StatusColor))]
+    [NotifyPropertyChangedFor(nameof(StatusIcon))]
+    private string status = "OFFLINE";
+
+    public string Name { get; set; } = string.Empty;
+    public string IpAddress { get; set; } = string.Empty;
+    public string Detail { get; set; } = string.Empty;
+    public string Protocol { get; set; } = string.Empty;
+
+    public string StatusColor => Status switch
+    {
+        "RUN" => "#10B981",    // Emerald
+        "ERROR" => "#EF4444",  // Red
+        "OFFLINE" => "#64748B",// Slate
+        _ => "#64748B"
+    };
+
+    public string StatusIcon => Status switch
+    {
+        "RUN" => "⚡",
+        "ERROR" => "⚠",
+        "OFFLINE" => "⏸",
+        _ => "❓"
+    };
+}
+
+public class SystemLogItem
+{
+    public string Time { get; set; } = string.Empty;
+    public string Level { get; set; } = string.Empty;
+    public string Message { get; set; } = string.Empty;
+
+    public string LevelColor => Level switch
+    {
+        "Info" => "#3B82F6",
+        "Success" => "#10B981",
+        "Warning" => "#F59E0B",
+        "Error" => "#EF4444",
+        _ => "#94A3B8"
     };
 }
