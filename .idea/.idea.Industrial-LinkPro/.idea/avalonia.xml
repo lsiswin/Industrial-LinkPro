@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="AvaloniaProject">
+    <option name="projectPerEditor">
+      <map>
+        <entry key="RadioIndustrialApp/App.axaml" value="RadioIndustrialApp/RadioIndustrialApp.csproj" />
+        <entry key="RadioIndustrialApp/Controls/KpiCard.axaml" value="RadioIndustrialApp/RadioIndustrialApp.csproj" />
+        <entry key="RadioIndustrialApp/Views/AlarmsView.axaml" value="RadioIndustrialApp/RadioIndustrialApp.csproj" />
+        <entry key="RadioIndustrialApp/Views/AnalysisView.axaml" value="RadioIndustrialApp/RadioIndustrialApp.csproj" />
+        <entry key="RadioIndustrialApp/Views/DeviceView.axaml" value="RadioIndustrialApp/RadioIndustrialApp.csproj" />
+        <entry key="RadioIndustrialApp/Views/IndexView.axaml" value="RadioIndustrialApp/RadioIndustrialApp.csproj" />
+        <entry key="RadioIndustrialApp/Views/MainWindow.axaml" value="RadioIndustrialApp/RadioIndustrialApp.csproj" />
+        <entry key="RadioIndustrialApp/Views/SettingView.axaml" value="RadioIndustrialApp/RadioIndustrialApp.csproj" />
+      </map>
+    </option>
+  </component>
+</project>
