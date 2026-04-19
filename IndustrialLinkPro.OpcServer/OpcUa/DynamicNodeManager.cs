@@ -1,4 +1,7 @@
+using IndustrialLinkPro.OpcServer.Clients;
+using IndustrialLinkPro.OpcServer.Contracts;
 using IndustrialLinkPro.OpcServer.Runtime;
+using Microsoft.Extensions.Logging;
 using Opc.Ua;
 using Opc.Ua.Server;
 
@@ -11,11 +14,13 @@ namespace IndustrialLinkPro.OpcServer.OpcUa;
 internal sealed class DynamicNodeManager : CustomNodeManager2
 {
     private readonly IRuntimeNodeRegistry _registry;
+    private readonly DeviceApiClient? _deviceApiClient;
+    private readonly ILogger<DynamicNodeManager>? _logger;
     private readonly object _syncRoot = new();
-    
+
     // 根节点：所有设备节点挂载其下
     private FolderState? _devicesFolder;
-    
+
     // 映射查找表：缓存着运行时点位 ID 以及其实际绑定分配在地址空间中的被动 OPC 变量状态
     private readonly Dictionary<Guid, BaseDataVariableState> _pointVariables = new();
 
@@ -26,10 +31,14 @@ internal sealed class DynamicNodeManager : CustomNodeManager2
         IServerInternal server,
         ApplicationConfiguration configuration,
         IRuntimeNodeRegistry registry,
-        string namespaceUri)
+        string namespaceUri,
+        DeviceApiClient? deviceApiClient = null,
+        ILogger<DynamicNodeManager>? logger = null)
         : base(server, configuration, namespaceUri)
     {
         _registry = registry;
+        _deviceApiClient = deviceApiClient;
+        _logger = logger;
         // 把本节点的产生器工厂方法赋到上下文中
         SystemContext.NodeIdFactory = this;
     }
@@ -121,6 +130,82 @@ internal sealed class DynamicNodeManager : CustomNodeManager2
                 CreateVariable(dataPointsFolder, point);
             }
         }
+
+        // 创建完节点后,异步更新 NodeId 到 DeviceApi
+        // ---------- 新增：异步回写 NodeId 到 DeviceApi ----------
+    if (_deviceApiClient is not null)
+    {
+        // 收集所有点位的 NodeId 信息，用于批量更新
+        var updateRequests = new List<UpdateNodeIdRequest>();
+        foreach (var kvp in _pointVariables)
+        {
+            var pointId = kvp.Key;
+            var variable = kvp.Value;
+
+            // 确保变量已经拥有有效的 NodeId
+            if (variable.NodeId != null && !variable.NodeId.IsNullNodeId)
+            {
+                updateRequests.Add(new UpdateNodeIdRequest
+                {
+                    DataPointId = pointId,
+                    NodeId = variable.NodeId.ToString(),
+                    NamespaceIndex = variable.NodeId.NamespaceIndex
+                });
+            }
+        }
+
+        if (updateRequests.Count > 0)
+        {
+            // 采用即发即忘的方式异步发送，不阻塞当前重建过程
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    // 获取访问令牌（如果配置了认证）
+                    string? accessToken = null;
+                    try
+                    {
+                        // 使用一个短暂的超时，避免长期阻塞
+                        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+                        accessToken = await _deviceApiClient.LoginAsync(cts.Token).ConfigureAwait(false);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger?.LogWarning(ex, "登录 DeviceApi 失败，将尝试无认证方式更新 NodeId");
+                    }
+
+                    // 执行批量更新
+                    using var ctstoken = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+                    var success = await _deviceApiClient.BatchUpdateNodeIdsAsync(
+                        updateRequests,
+                        accessToken,
+                        ctstoken.Token).ConfigureAwait(false);
+
+                    if (success)
+                    {
+                        _logger?.LogInformation("成功向 DeviceApi 回写了 {Count} 个数据点的 NodeId", updateRequests.Count);
+                    }
+                    else
+                    {
+                        _logger?.LogWarning("向 DeviceApi 回写 NodeId 失败，请检查网络或 API 状态");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger?.LogError(ex, "异步更新 NodeId 至 DeviceApi 时发生异常");
+                }
+            });
+        }
+        else
+        {
+            _logger?.LogDebug("当前地址空间中无任何点位需要回写 NodeId");
+        }
+    }
+    else
+    {
+        _logger?.LogWarning("DeviceApiClient 未注入，NodeId 回写功能被跳过");
+    }
+
     }
 
     /// <summary>

@@ -30,11 +30,11 @@
     </ItemGroup>
 
     <ItemGroup>
+      <ProjectReference Include="..\IndustrialLinkPro.OpcClient\IndustrialLinkPro.OpcClient.csproj" />
       <ProjectReference Include="..\RadioIndustriaLibrary\RadioIndustriaLibrary.csproj" />
     </ItemGroup>
 
     <ItemGroup>
-      <Folder Include="Models\" />
       <Folder Include="Services\" />
     </ItemGroup>
 

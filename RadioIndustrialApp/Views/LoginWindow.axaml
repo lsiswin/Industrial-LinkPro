@@ -1,0 +1,55 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:vm="clr-namespace:RadioIndustrialApp.ViewModels"
+        mc:Ignorable="d" Width="400" Height="500"
+        x:Class="RadioIndustrialApp.Views.LoginWindow"
+        x:DataType="vm:LoginViewModel"
+        Title="身份认证"
+        WindowStartupLocation="CenterOwner"
+        CanResize="False"
+        Background="Transparent"
+        TransparencyLevelHint="AcrylicBlur"
+        ExtendClientAreaToDecorationsHint="True">
+
+    <Grid Background="#CC0B0F19">
+        <Border Margin="20" Background="#111827" CornerRadius="12"
+                BorderBrush="#1F2937" BorderThickness="1"
+                BoxShadow="0 10 30 0 #40000000">
+            <StackPanel Margin="30" Spacing="20" VerticalAlignment="Center">
+                
+                <TextBlock Text="工业设备身份认证" FontSize="20" FontWeight="Bold" Foreground="White" HorizontalAlignment="Center"/>
+                <TextBlock Text="ColdDream Central Station" FontSize="14" Foreground="#9CA3AF" HorizontalAlignment="Center" Margin="0,-15,0,10"/>
+
+                <TextBox Watermark="用户名 (例如: admin)"
+                         Text="{Binding UserName}"
+                         Background="#1F2937" Foreground="White" BorderBrush="#374151" CornerRadius="4" Padding="10"/>
+
+                <TextBox Watermark="密码 (例如: Admin@123456)" PasswordChar="●"
+                         Text="{Binding Password}"
+                         Background="#1F2937" Foreground="White" BorderBrush="#374151" CornerRadius="4" Padding="10"/>
+
+                <TextBlock Text="{Binding ErrorMessage}" Foreground="#EF4444" FontSize="12" 
+                           IsVisible="{Binding ErrorMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" 
+                           TextWrapping="Wrap" HorizontalAlignment="Center"/>
+
+                <Button Content="{Binding IsLoading, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" 
+                        Command="{Binding LoginCommand}"
+                        Background="#00D2FF" Foreground="#0B0F19" FontWeight="Bold" CornerRadius="4" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Padding="10">
+                    <Button.Content>
+                        <TextBlock Text="安全登录" IsVisible="{Binding !IsLoading}"/>
+                    </Button.Content>
+                </Button>
+
+                <Button Content="仅访客模式浏览" 
+                        Command="{Binding LoginAsGuestCommand}"
+                        Background="Transparent" Foreground="#00D2FF" BorderBrush="#00D2FF" BorderThickness="1" CornerRadius="4" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Padding="10">
+                </Button>
+
+                <TextBlock Text="Default: operator / Operator@123456" FontSize="11" Foreground="#4B5563" HorizontalAlignment="Center" Margin="0,15,0,0"/>
+
+            </StackPanel>
+        </Border>
+    </Grid>
+</Window>

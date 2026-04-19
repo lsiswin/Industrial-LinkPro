@@ -1,3 +1,4 @@
+using IndustrialLinkPro.OpcServer.Clients;
 using IndustrialLinkPro.OpcServer.Configuration;
 using IndustrialLinkPro.OpcServer.Runtime;
 using Microsoft.Extensions.Options;
@@ -12,13 +13,17 @@ namespace IndustrialLinkPro.OpcServer.OpcUa;
 /// </summary>
 public sealed class OpcUaServerHost(
     ILogger<OpcUaServerHost> logger,
+    ILoggerFactory loggerFactory,
     IRuntimeNodeRegistry runtimeNodeRegistry,
-    IOptions<OpcServerOptions> options
+    IOptions<OpcServerOptions> options,
+    DeviceApiClient deviceApiClient
 ) : IOpcUaServerHost, IHostedService
 {
     private readonly ILogger<OpcUaServerHost> _logger = logger;
+    private readonly ILoggerFactory _loggerFactory = loggerFactory;
     private readonly IRuntimeNodeRegistry _runtimeNodeRegistry = runtimeNodeRegistry;
     private readonly OpcServerOptions _options = options.Value;
+    private readonly DeviceApiClient _deviceApiClient = deviceApiClient;
     private ApplicationInstance? _application;
     private DynamicOpcUaServer? _server;
 
@@ -49,7 +54,11 @@ public sealed class OpcUaServerHost(
             _logger.LogWarning("OPC UA 服务器应用证书缺失或无法生成，连接可能会失败。");
         }
 
-        _server = new DynamicOpcUaServer(_runtimeNodeRegistry, _options.NamespaceUri);
+        _server = new DynamicOpcUaServer(
+            _runtimeNodeRegistry, 
+            _options.NamespaceUri, 
+            _deviceApiClient, 
+            _loggerFactory.CreateLogger<DynamicNodeManager>());
         await _application.StartAsync(_server);
 
         // 挂载点位变更事件

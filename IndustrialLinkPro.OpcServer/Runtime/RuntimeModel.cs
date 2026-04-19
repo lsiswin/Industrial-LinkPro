@@ -24,22 +24,26 @@ public sealed class RuntimeModel(IConfiguration configuration) : IRuntimeNodeReg
     public event Action<PointRuntime>? PointValueChanged;
 
     /// <inheritdoc/>
+    public event Action<PointRuntime>? PointAdded;
+
+    /// <inheritdoc/>
     public ApplyDefinitionsResult ApplyDefinitions(IReadOnlyCollection<DeviceDefinition> devices)
     {
-        var topologyChanged = false;
+        var deviceTopologyChanged = false;
+        var pointsChanged = false;
         var incomingDeviceIds = devices.Select(x => x.Id).ToHashSet();
         var incomingPointIds = devices.SelectMany(x => x.DataPoints).Select(x => x.Id).ToHashSet();
 
         // 移除已经不在最新配置中的旧设备实体
         foreach (var removedDeviceId in _devices.Keys.Except(incomingDeviceIds))
         {
-            topologyChanged = _devices.TryRemove(removedDeviceId, out _) || topologyChanged;
+            deviceTopologyChanged = _devices.TryRemove(removedDeviceId, out _) || deviceTopologyChanged;
         }
 
         // 移除已经不在最新配置中的旧点位实体
         foreach (var removedPointId in _points.Keys.Except(incomingPointIds))
         {
-            topologyChanged = _points.TryRemove(removedPointId, out _) || topologyChanged;
+            pointsChanged = _points.TryRemove(removedPointId, out _) || pointsChanged;
             _pointDefinitions.TryRemove(removedPointId, out _);
         }
 
@@ -50,8 +54,8 @@ public sealed class RuntimeModel(IConfiguration configuration) : IRuntimeNodeReg
                 device.Id,
                 _ =>
                 {
-                    // 发现新设备，标记拓扑发生了变化
-                    topologyChanged = true;
+                    // 发现新设备，标记设备拓扑发生了变化
+                    deviceTopologyChanged = true;
                     return new DeviceRuntime
                     {
                         DeviceId = device.Id,
@@ -73,7 +77,7 @@ public sealed class RuntimeModel(IConfiguration configuration) : IRuntimeNodeReg
                     existing.ConnectionString = device.ConnectionString;
                     existing.Status = device.Status;
                     existing.LastSeenUtc = DateTimeOffset.UtcNow;
-                    topologyChanged |= existingSnapshot != (device.Name, device.ProtocolType, device.ConnectionString);
+                    deviceTopologyChanged |= existingSnapshot != (device.Name, device.ProtocolType, device.ConnectionString);
                     return existing;
                 });
 
@@ -86,9 +90,9 @@ public sealed class RuntimeModel(IConfiguration configuration) : IRuntimeNodeReg
                     point.Id,
                     _ =>
                     {
-                        // 发现新点位，标记拓扑发生了变化
-                        topologyChanged = true;
-                        return new PointRuntime
+                        // 发现新点位，标记点位发生了变化
+                        pointsChanged = true;
+                        var newPoint = new PointRuntime
                         {
                             PointId = point.Id,
                             DeviceId = point.DeviceId,
@@ -97,6 +101,9 @@ public sealed class RuntimeModel(IConfiguration configuration) : IRuntimeNodeReg
                             DataType = point.DataType,
                             TimestampUtc = DateTimeOffset.UtcNow,
                         };
+                        // 触发新点位添加事件
+                        PointAdded?.Invoke(newPoint);
+                        return newPoint;
                     },
                     (_, existing) =>
                     {
@@ -105,7 +112,7 @@ public sealed class RuntimeModel(IConfiguration configuration) : IRuntimeNodeReg
                         existing.Address = point.Address;
                         existing.Name = point.Name;
                         existing.DataType = point.DataType;
-                        topologyChanged |= existingSnapshot != (point.Address, point.Name, point.DataType);
+                        pointsChanged |= existingSnapshot != (point.Address, point.Name, point.DataType);
                         return existing;
                     });
             }
@@ -113,7 +120,7 @@ public sealed class RuntimeModel(IConfiguration configuration) : IRuntimeNodeReg
             runtime.LastSeenUtc = DateTimeOffset.UtcNow;
         }
 
-        return new ApplyDefinitionsResult(topologyChanged);
+        return new ApplyDefinitionsResult(deviceTopologyChanged, pointsChanged);
     }
 
     /// <inheritdoc/>
