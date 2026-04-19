@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
 using System.Threading.Tasks;
@@ -37,69 +38,96 @@ public partial class DeviceViewModel : ViewModelBase, IDisposable
     }
 
     [RelayCommand]
-    private async Task LoadDataAsync()
+    private async Task LoadDataAsync(object? parameter)
     {
-        if (IsLoading)
+        if (IsLoading) return;
+
+        // 解析参数：支持 bool 类型或字符串 "True"/"False"
+        bool forceLoad = false;
+        if (parameter is bool b)
+        {
+            forceLoad = b;
+        }
+        else if (parameter is string s && bool.TryParse(s, out var sb))
+        {
+            forceLoad = sb;
+        }
+
+        // 如果不是强制刷新，且已经有设备数据，则直接跳过加载逻辑
+        if (!forceLoad && Devices.Count > 0)
+        {
             return;
+        }
+        
         IsLoading = true;
 
         try
         {
-            Devices.Clear();
-            var devicesDto = await _httpClientService.GetDevicesAsync();
+            // 在后台线程执行繁重的数据拉取和处理
+            await Task.Run(async () => {
+                var devicesDto = await _httpClientService.GetDevicesAsync();
+                var allNodeIds = new List<string>();
+                var tempDeviceList = new List<DeviceItemViewModel>();
 
-            var allNodeIds = new System.Collections.Generic.List<string>();
-
-            foreach (var dto in devicesDto)
-            {
-                var deviceVm = new DeviceItemViewModel
-                {
-                    Id = dto.Id,
-                    Name = dto.Name,
-                    Status = dto.Status,
-                    Description = dto.Description,
-                };
-
-                var pointsDto = await _httpClientService.GetDataPointsAsync(dto.Id);
-                foreach (var p in pointsDto)
-                {
-                    var dpVm = new DataPointItemViewModel
+                // 使用并发请求获取所有设备的点位
+                var tasks = devicesDto.Select(async dto => {
+                    var deviceVm = new DeviceItemViewModel
                     {
-                        Id = p.Id,
-                        Name = p.Name,
-                        NodeId = p.NodeId,
-                        Unit = p.Unit,
-                        Value = "Loading...",
+                        Id = dto.Id,
+                        Name = dto.Name,
+                        Status = dto.Status,
+                        Description = dto.Description,
                     };
-                    deviceVm.DataPoints.Add(dpVm);
 
-                    if (!string.IsNullOrWhiteSpace(p.NodeId))
+                    var pointsDto = await _httpClientService.GetDataPointsAsync(dto.Id);
+                    foreach (var p in pointsDto)
                     {
-                        allNodeIds.Add(p.NodeId);
+                        var dpVm = new DataPointItemViewModel
+                        {
+                            Id = p.Id,
+                            Name = p.Name,
+                            NodeId = p.NodeId,
+                            Unit = p.Unit,
+                            Value = "Waiting...",
+                        };
+                        deviceVm.DataPoints.Add(dpVm);
+
+                        if (!string.IsNullOrWhiteSpace(p.NodeId))
+                        {
+                            lock (allNodeIds)
+                            {
+                                allNodeIds.Add(p.NodeId);
+                            }
+                        }
                     }
-                }
+                    return deviceVm;
+                });
 
-                Devices.Add(deviceVm);
-            }
+                var results = await Task.WhenAll(tasks);
 
-            if (allNodeIds.Any())
-            {
-                if (_opcClientService.CurrentStatus == ConnectionStatus.Connected)
+                // 回到 UI 线程更新集合
+                await Dispatcher.UIThread.InvokeAsync(() => {
+                    Devices.Clear();
+                    foreach (var res in results) Devices.Add(res);
+                    
+                    if (Devices.Any())
+                        SelectedDevice = Devices.First();
+                });
+
+                // OPC 连接和订阅操作同样放在后台
+                if (allNodeIds.Any())
                 {
-                    await _opcClientService.ClearSubscriptionsAsync(); // 防止多次点击刷新导致节点句柄堆叠
+                    if (_opcClientService.CurrentStatus == ConnectionStatus.Connected)
+                    {
+                        await _opcClientService.ClearSubscriptionsAsync();
+                    }
+                    else
+                    {
+                        await _opcClientService.ConnectAsync();
+                    }
+                    await _opcClientService.SubscribeToNodesAsync(allNodeIds);
                 }
-                else
-                {
-                    await _opcClientService.ConnectAsync();
-                }
-                
-                await _opcClientService.SubscribeToNodesAsync(allNodeIds);
-            }
-
-            if (Devices.Any())
-            {
-                SelectedDevice = Devices.First();
-            }
+            });
         }
         catch (Exception ex)
         {
@@ -121,7 +149,6 @@ public partial class DeviceViewModel : ViewModelBase, IDisposable
                 if (pt != null)
                 {
                     pt.Value = e.DataPoint.Value?.ToString() ?? "N/A";
-                    // You could also update a timestamp property here
                     break;
                 }
             }

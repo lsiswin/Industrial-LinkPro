@@ -13,7 +13,7 @@
     <!-- Trigger LoadDataCommand on view loaded -->
     <Interaction.Behaviors>
         <EventTriggerBehavior EventName="Loaded">
-            <InvokeCommandAction Command="{Binding LoadDataCommand}" />
+            <InvokeCommandAction Command="{Binding LoadDataCommand}" PassEventArgsToCommand="False" />
         </EventTriggerBehavior>
     </Interaction.Behaviors>
 
@@ -27,7 +27,7 @@
                     <TextBlock Text="Real-time device monitoring via OPC UA" FontSize="14" Foreground="#9CA3AF" Margin="0,5,0,0"/>
                 </StackPanel>
                 
-                <Button Grid.Column="1" Command="{Binding LoadDataCommand}" Classes="RefreshBtn" 
+                <Button Grid.Column="1" Command="{Binding LoadDataCommand}" CommandParameter="{x:True}" Classes="RefreshBtn" 
                         Background="#00D2FF" Foreground="Black" FontWeight="Bold" CornerRadius="8" Padding="15,10">
                     <TextBlock Text="REFRESH" />
                 </Button>
@@ -45,10 +45,9 @@
             
             <!-- Left: Device List -->
             <Border Grid.Column="0" CornerRadius="16" Background="#0AFFFFFF" BorderBrush="#1FFFFFFF" BorderThickness="1" Padding="10">
-                <!-- 隐藏 ListBox 默认选中背景，我们使用自身的触发器或毛玻璃增强显示 -->
+                <!-- 隐藏 ListBox 默认选中背景 -->
                 <ListBox ItemsSource="{Binding Devices}" SelectedItem="{Binding SelectedDevice}" Background="Transparent" 
                          BorderThickness="0" CornerRadius="16" >
-                    <!-- 去掉默认高亮样式使它更符合科技感 -->
                     <ListBox.Styles>
                         <Style Selector="ListBoxItem:selected /template/ ContentPresenter">
                             <Setter Property="Background" Value="#2000D2FF" />
@@ -94,7 +93,7 @@
                         <ItemsControl ItemsSource="{Binding SelectedDevice.DataPoints}">
                             <ItemsControl.ItemsPanel>
                                 <ItemsPanelTemplate>
-                                    <WrapPanel Orientation="Horizontal" /> <!-- 使用 WrapPanel 以便于屏幕宽敞时一行展示多个卡片 -->
+                                    <WrapPanel Orientation="Horizontal" /> 
                                 </ItemsPanelTemplate>
                             </ItemsControl.ItemsPanel>
 

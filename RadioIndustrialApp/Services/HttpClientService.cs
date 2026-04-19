@@ -46,9 +46,13 @@ public interface IHttpClientService
     Task<object?> BatchSavePlcDataAsync(BatchPlcDataRequest request, CancellationToken cancellationToken = default);
     Task<object?> SavePlcDataAsync(PlcDataItemRequest request, CancellationToken cancellationToken = default);
     Task<object?> GetPlcDataByIdAsync(Guid id, CancellationToken cancellationToken = default);
-    Task<object?> QueryPlcDataAsync(string queryParams, CancellationToken cancellationToken = default);
-    Task<object?> GetLatestPlcDataAsync(Guid deviceId, int top = 10, CancellationToken cancellationToken = default);
-    Task<object?> CleanupOldPlcDataAsync(int retainDays = 30, CancellationToken cancellationToken = default);
+    Task<PlcDataPagedResponse?> QueryPlcDataAsync(string queryParams, CancellationToken cancellationToken = default);
+    Task<List<PlcDataRecordDto>> GetLatestPlcDataAsync(Guid deviceId, int top = 10, CancellationToken cancellationToken = default);
+
+    // === AlarmsController 报警相关 ===
+    Task<List<AlarmDto>> GetActiveAlarmsAsync(CancellationToken cancellationToken = default);
+    Task<List<AlarmDto>> GetAlarmHistoryAsync(int take = 100, CancellationToken cancellationToken = default);
+    Task<bool> AcknowledgeAlarmAsync(Guid alarmId, CancellationToken cancellationToken = default);
 }
 
 /// <summary>
@@ -74,9 +78,6 @@ public class HttpClientService : IHttpClientService
 
     #region AuthController 认证相关 API
     
-    /// <summary>
-    /// 登录接口 (POST /api/auth/login)
-    /// </summary>
     public async Task<AuthResponse?> LoginAsync(LoginRequest request, CancellationToken cancellationToken = default)
     {
         try
@@ -88,23 +89,15 @@ public class HttpClientService : IHttpClientService
                 if (authResult?.AccessToken != null)
                 {
                     _accessToken = authResult.AccessToken;
-                    // 在此后所有请求中附加上 Auth Bearer Token 用于身份校验
                     _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _accessToken);
                 }
                 return authResult;
             }
             return null;
         }
-        catch (Exception ex)
-        {
-            System.Diagnostics.Debug.WriteLine($"Login failed: {ex.Message}");
-            return null;
-        }
+        catch { return null; }
     }
 
-    /// <summary>
-    /// 登出：从客户端移除 JWT Token
-    /// </summary>
     public void Logout()
     {
         _accessToken = null;
@@ -115,9 +108,6 @@ public class HttpClientService : IHttpClientService
 
     #region DashboardController 仪表盘相关 API
     
-    /// <summary>
-    /// 获取仪表盘统计总览 (GET /api/admin/dashboard/stats)
-    /// </summary>
     public async Task<DashboardStatsDto> GetDashboardStatsAsync(CancellationToken cancellationToken = default)
     {
         try
@@ -125,20 +115,13 @@ public class HttpClientService : IHttpClientService
             var response = await _httpClient.GetFromJsonAsync<DashboardStatsDto>("/api/admin/dashboard/stats", JsonOptions, cancellationToken);
             return response ?? new DashboardStatsDto();
         }
-        catch (Exception ex)
-        {
-            System.Diagnostics.Debug.WriteLine($"Failed to get dashboard stats: {ex.Message}");
-            return new DashboardStatsDto();
-        }
+        catch { return new DashboardStatsDto(); }
     }
 
     #endregion
 
     #region AdminDevicesController / OpcController 设备与数据点相关 API
 
-    /// <summary>
-    /// 获取设备列表 (GET /api/admin/devices)
-    /// </summary>
     public async Task<List<DeviceDto>> GetDevicesAsync(CancellationToken cancellationToken = default)
     {
         try
@@ -146,16 +129,9 @@ public class HttpClientService : IHttpClientService
             var response = await _httpClient.GetFromJsonAsync<List<DeviceDto>>("/api/admin/devices", JsonOptions, cancellationToken);
             return response ?? new List<DeviceDto>();
         }
-        catch (Exception ex)
-        {
-            System.Diagnostics.Debug.WriteLine($"Failed to get devices: {ex.Message}");
-            return new List<DeviceDto>();
-        }
+        catch { return new List<DeviceDto>(); }
     }
 
-    /// <summary>
-    /// 根据设备ID获取数据点列表 (GET /api/admin/devices/{deviceId}/datapoints)
-    /// </summary>
     public async Task<List<DataPointDto>> GetDataPointsAsync(Guid deviceId, CancellationToken cancellationToken = default)
     {
         try
@@ -163,116 +139,22 @@ public class HttpClientService : IHttpClientService
             var response = await _httpClient.GetFromJsonAsync<List<DataPointDto>>($"/api/admin/devices/{deviceId}/datapoints", JsonOptions, cancellationToken);
             return response ?? new List<DataPointDto>();
         }
-        catch (Exception ex)
-        {
-            System.Diagnostics.Debug.WriteLine($"Failed to get data points for device {deviceId}: {ex.Message}");
-            return new List<DataPointDto>();
-        }
+        catch { return new List<DataPointDto>(); }
     }
     
-    /// <summary>
-    /// 根据ID获取设备单体详情 (GET /api/admin/devices/{deviceId})
-    /// </summary>
-    public async Task<object?> GetDeviceByIdAsync(Guid deviceId, CancellationToken cancellationToken = default)
-    {
-        try { return await _httpClient.GetFromJsonAsync<object>($"/api/admin/devices/{deviceId}", JsonOptions, cancellationToken); }
-        catch { return null; }
-    }
-
-    /// <summary>
-    /// 创建新设备 (POST /api/admin/devices)
-    /// </summary>
-    public async Task<object?> CreateDeviceAsync(DeviceDto deviceDto, CancellationToken cancellationToken = default)
-    {
-        try
-        {
-            var r = await _httpClient.PostAsJsonAsync("/api/admin/devices", deviceDto, cancellationToken);
-            return await r.Content.ReadFromJsonAsync<object>(JsonOptions, cancellationToken);
-        }
-        catch { return null; }
-    }
-
-    /// <summary>
-    /// 更新设备 (PUT /api/admin/devices/{deviceId})
-    /// </summary>
-    public async Task<object?> UpdateDeviceAsync(Guid deviceId, DeviceDto deviceDto, CancellationToken cancellationToken = default)
-    {
-        try
-        {
-            var r = await _httpClient.PutAsJsonAsync($"/api/admin/devices/{deviceId}", deviceDto, cancellationToken);
-            return await r.Content.ReadFromJsonAsync<object>(JsonOptions, cancellationToken);
-        }
-        catch { return null; }
-    }
-
-    /// <summary>
-    /// 删除设备 (DELETE /api/admin/devices/{deviceId})
-    /// </summary>
-    public async Task<bool> DeleteDeviceAsync(Guid deviceId, CancellationToken cancellationToken = default)
-    {
-        try
-        {
-            var r = await _httpClient.DeleteAsync($"/api/admin/devices/{deviceId}", cancellationToken);
-            return r.IsSuccessStatusCode;
-        }
-        catch { return false; }
-    }
-
-    /// <summary>
-    /// 获取单个数据点的NodeId (GET /api/opc/datapoints/{dataPointId}/nodeid)
-    /// </summary>
-    public async Task<object?> GetDataPointNodeIdAsync(Guid dataPointId, CancellationToken cancellationToken = default)
-    {
-        try { return await _httpClient.GetFromJsonAsync<object>($"/api/opc/datapoints/{dataPointId}/nodeid", JsonOptions, cancellationToken); }
-        catch { return null; }
-    }
-
-    /// <summary>
-    /// 批量获取数据点的NodeId (POST /api/opc/datapoints/nodeid/batch-get)
-    /// </summary>
-    public async Task<object?> BatchGetDataPointNodeIdsAsync(BatchGetNodeIdRequest request, CancellationToken cancellationToken = default)
-    {
-        try
-        {
-            var r = await _httpClient.PostAsJsonAsync("/api/opc/datapoints/nodeid/batch-get", request, cancellationToken);
-            return await r.Content.ReadFromJsonAsync<object>(JsonOptions, cancellationToken);
-        }
-        catch { return null; }
-    }
-
-    /// <summary>
-    /// 更新单个数据点的NodeId (POST /api/opc/datapoints/{dataPointId}/nodeid)
-    /// </summary>
-    public async Task<object?> UpdateDataPointNodeIdAsync(Guid dataPointId, UpdateDataPointNodeIdRequest request, CancellationToken cancellationToken = default)
-    {
-        try
-        {
-            var r = await _httpClient.PostAsJsonAsync($"/api/opc/datapoints/{dataPointId}/nodeid", request, cancellationToken);
-            return await r.Content.ReadFromJsonAsync<object>(JsonOptions, cancellationToken);
-        }
-        catch { return null; }
-    }
-
-    /// <summary>
-    /// 批量更新数据点的NodeId (POST /api/opc/datapoints/nodeid/batch)
-    /// </summary>
-    public async Task<object?> BatchUpdateDataPointNodeIdsAsync(List<UpdateNodeIdBatchRequest> request, CancellationToken cancellationToken = default)
-    {
-        try
-        {
-            var r = await _httpClient.PostAsJsonAsync("/api/opc/datapoints/nodeid/batch", request, cancellationToken);
-            return await r.Content.ReadFromJsonAsync<object>(JsonOptions, cancellationToken);
-        }
-        catch { return null; }
-    }
+    public async Task<object?> GetDeviceByIdAsync(Guid deviceId, CancellationToken cancellationToken = default) => await _httpClient.GetFromJsonAsync<object>($"/api/admin/devices/{deviceId}", JsonOptions, cancellationToken);
+    public async Task<object?> CreateDeviceAsync(DeviceDto deviceDto, CancellationToken cancellationToken = default) => (await _httpClient.PostAsJsonAsync("/api/admin/devices", deviceDto, cancellationToken)).Content.ReadFromJsonAsync<object>(JsonOptions, cancellationToken);
+    public async Task<object?> UpdateDeviceAsync(Guid deviceId, DeviceDto deviceDto, CancellationToken cancellationToken = default) => (await _httpClient.PutAsJsonAsync($"/api/admin/devices/{deviceId}", deviceDto, cancellationToken)).Content.ReadFromJsonAsync<object>(JsonOptions, cancellationToken);
+    public async Task<bool> DeleteDeviceAsync(Guid deviceId, CancellationToken cancellationToken = default) => (await _httpClient.DeleteAsync($"/api/admin/devices/{deviceId}", cancellationToken)).IsSuccessStatusCode;
+    public async Task<object?> GetDataPointNodeIdAsync(Guid dataPointId, CancellationToken cancellationToken = default) => await _httpClient.GetFromJsonAsync<object>($"/api/opc/datapoints/{dataPointId}/nodeid", JsonOptions, cancellationToken);
+    public async Task<object?> BatchGetDataPointNodeIdsAsync(BatchGetNodeIdRequest request, CancellationToken cancellationToken = default) => (await _httpClient.PostAsJsonAsync("/api/opc/datapoints/nodeid/batch-get", request, cancellationToken)).Content.ReadFromJsonAsync<object>(JsonOptions, cancellationToken);
+    public async Task<object?> UpdateDataPointNodeIdAsync(Guid dataPointId, UpdateDataPointNodeIdRequest request, CancellationToken cancellationToken = default) => (await _httpClient.PostAsJsonAsync($"/api/opc/datapoints/{dataPointId}/nodeid", request, cancellationToken)).Content.ReadFromJsonAsync<object>(JsonOptions, cancellationToken);
+    public async Task<object?> BatchUpdateDataPointNodeIdsAsync(List<UpdateNodeIdBatchRequest> request, CancellationToken cancellationToken = default) => (await _httpClient.PostAsJsonAsync("/api/opc/datapoints/nodeid/batch", request, cancellationToken)).Content.ReadFromJsonAsync<object>(JsonOptions, cancellationToken);
 
     #endregion
 
     #region OperationLogsController 操作日志相关 API
 
-    /// <summary>
-    /// 获取最近的操作日志 (GET /api/admin/operation-logs)
-    /// </summary>
     public async Task<List<OperationLogDto>> GetOperationLogsAsync(int take = 100, CancellationToken cancellationToken = default)
     {
         try
@@ -280,102 +162,82 @@ public class HttpClientService : IHttpClientService
             var response = await _httpClient.GetFromJsonAsync<List<OperationLogDto>>($"/api/admin/operation-logs?take={take}", JsonOptions, cancellationToken);
             return response ?? new List<OperationLogDto>();
         }
-        catch (Exception ex)
-        {
-            System.Diagnostics.Debug.WriteLine($"Failed to get logs: {ex.Message}");
-            return new List<OperationLogDto>();
-        }
+        catch { return new List<OperationLogDto>(); }
     }
 
     #endregion
 
     #region PermissionsController 权限相关 API
 
-    /// <summary>
-    /// 获取当前登录用户的权限总览 (GET /api/admin/permissions/me)
-    /// </summary>
-    public async Task<PermissionSummaryResponse?> GetMyPermissionsAsync(CancellationToken cancellationToken = default)
-    {
-        try
-        {
-            return await _httpClient.GetFromJsonAsync<PermissionSummaryResponse>("/api/admin/permissions/me", JsonOptions, cancellationToken);
-        }
-        catch (Exception ex)
-        {
-            System.Diagnostics.Debug.WriteLine($"Failed to get permissions: {ex.Message}");
-            return null;
-        }
-    }
+    public async Task<PermissionSummaryResponse?> GetMyPermissionsAsync(CancellationToken cancellationToken = default) => await _httpClient.GetFromJsonAsync<PermissionSummaryResponse>("/api/admin/permissions/me", JsonOptions, cancellationToken);
 
     #endregion
 
     #region PlcDataController PLC数据记录相关 API
 
-    /// <summary>
-    /// 批量保存PLC数据 (POST /api/plc-data/batch)
-    /// </summary>
-    public async Task<object?> BatchSavePlcDataAsync(BatchPlcDataRequest request, CancellationToken cancellationToken = default)
+    public async Task<object?> BatchSavePlcDataAsync(BatchPlcDataRequest request, CancellationToken cancellationToken = default) => (await _httpClient.PostAsJsonAsync("/api/plc-data/batch", request, cancellationToken)).Content.ReadFromJsonAsync<object>(JsonOptions, cancellationToken);
+    public async Task<object?> SavePlcDataAsync(PlcDataItemRequest request, CancellationToken cancellationToken = default) => (await _httpClient.PostAsJsonAsync("/api/plc-data", request, cancellationToken)).Content.ReadFromJsonAsync<object>(JsonOptions, cancellationToken);
+    public async Task<object?> GetPlcDataByIdAsync(Guid id, CancellationToken cancellationToken = default) => await _httpClient.GetFromJsonAsync<object>($"/api/plc-data/{id}", JsonOptions, cancellationToken);
+    
+    public async Task<PlcDataPagedResponse?> QueryPlcDataAsync(string queryParams, CancellationToken cancellationToken = default)
     {
-        try
-        {
-            var r = await _httpClient.PostAsJsonAsync("/api/plc-data/batch", request, cancellationToken);
-            return await r.Content.ReadFromJsonAsync<object>(JsonOptions, cancellationToken);
+        try { return await _httpClient.GetFromJsonAsync<PlcDataPagedResponse>($"/api/plc-data/query{queryParams}", JsonOptions, cancellationToken); }
+        catch { return null; }
+    }
+
+    public async Task<List<PlcDataRecordDto>> GetLatestPlcDataAsync(Guid deviceId, int top = 10, CancellationToken cancellationToken = default)
+    {
+        try { return await _httpClient.GetFromJsonAsync<List<PlcDataRecordDto>>($"/api/plc-data/devices/{deviceId}/latest?top={top}", JsonOptions, cancellationToken) ?? new List<PlcDataRecordDto>(); }
+        catch { return new List<PlcDataRecordDto>(); }
+    }
+
+    #endregion
+
+    #region AlarmsController 报警相关 API
+
+    public async Task<List<AlarmDto>> GetActiveAlarmsAsync(CancellationToken cancellationToken = default)
+    {
+        try 
+        { 
+            var response = await _httpClient.GetAsync("/api/admin/alarms/active", cancellationToken);
+            if (!response.IsSuccessStatusCode)
+            {
+                var content = await response.Content.ReadAsStringAsync(cancellationToken);
+                System.Diagnostics.Debug.WriteLine($"GetActiveAlarms failed: {response.StatusCode}, {content}");
+                return new List<AlarmDto>();
+            }
+            return await response.Content.ReadFromJsonAsync<List<AlarmDto>>(JsonOptions, cancellationToken) ?? new List<AlarmDto>(); 
         }
-        catch { return null; }
-    }
-
-    /// <summary>
-    /// 单条保存PLC数据 (POST /api/plc-data)
-    /// </summary>
-    public async Task<object?> SavePlcDataAsync(PlcDataItemRequest request, CancellationToken cancellationToken = default)
-    {
-        try
-        {
-            var r = await _httpClient.PostAsJsonAsync("/api/plc-data", request, cancellationToken);
-            return await r.Content.ReadFromJsonAsync<object>(JsonOptions, cancellationToken);
+        catch (Exception ex)
+        { 
+            System.Diagnostics.Debug.WriteLine($"GetActiveAlarms exception: {ex.Message}");
+            return new List<AlarmDto>(); 
         }
-        catch { return null; }
     }
 
-    /// <summary>
-    /// 根据ID获取PLC持久化数据 (GET /api/plc-data/{id})
-    /// </summary>
-    public async Task<object?> GetPlcDataByIdAsync(Guid id, CancellationToken cancellationToken = default)
+    public async Task<List<AlarmDto>> GetAlarmHistoryAsync(int take = 100, CancellationToken cancellationToken = default)
     {
-        try { return await _httpClient.GetFromJsonAsync<object>($"/api/plc-data/{id}", JsonOptions, cancellationToken); }
-        catch { return null; }
-    }
-
-    /// <summary>
-    /// 分页条件查询PLC数据 (GET /api/plc-data/query)
-    /// </summary>
-    /// <param name="queryParams">例如: "?deviceId=xx&amp;pageIndex=1&amp;pageSize=100"</param>
-    public async Task<object?> QueryPlcDataAsync(string queryParams, CancellationToken cancellationToken = default)
-    {
-        try { return await _httpClient.GetFromJsonAsync<object>($"/api/plc-data/query{queryParams}", JsonOptions, cancellationToken); }
-        catch { return null; }
-    }
-
-    /// <summary>
-    /// 获取某个设备最新的PLC数据集合 (GET /api/plc-data/devices/{deviceId}/latest)
-    /// </summary>
-    public async Task<object?> GetLatestPlcDataAsync(Guid deviceId, int top = 10, CancellationToken cancellationToken = default)
-    {
-        try { return await _httpClient.GetFromJsonAsync<object>($"/api/plc-data/devices/{deviceId}/latest?top={top}", JsonOptions, cancellationToken); }
-        catch { return null; }
-    }
-
-    /// <summary>
-    /// 清理过期的基础PLC历史数据 (DELETE /api/plc-data/cleanup)
-    /// </summary>
-    public async Task<object?> CleanupOldPlcDataAsync(int retainDays = 30, CancellationToken cancellationToken = default)
-    {
-        try
-        {
-            var r = await _httpClient.DeleteAsync($"/api/plc-data/cleanup?retainDays={retainDays}", cancellationToken);
-            return await r.Content.ReadFromJsonAsync<object>(JsonOptions, cancellationToken);
+        try 
+        { 
+            var response = await _httpClient.GetAsync($"/api/admin/alarms/history?take={take}", cancellationToken);
+            if (!response.IsSuccessStatusCode)
+            {
+                System.Diagnostics.Debug.WriteLine($"GetAlarmHistory failed: {response.StatusCode}");
+                return new List<AlarmDto>();
+            }
+            return await response.Content.ReadFromJsonAsync<List<AlarmDto>>(JsonOptions, cancellationToken) ?? new List<AlarmDto>(); 
         }
-        catch { return null; }
+        catch (Exception ex)
+        { 
+            System.Diagnostics.Debug.WriteLine($"GetAlarmHistory exception: {ex.Message}");
+            return new List<AlarmDto>(); 
+        }
+    }
+
+    public async Task<bool> AcknowledgeAlarmAsync(Guid alarmId, CancellationToken cancellationToken = default)
+    {
+        try { return (await _httpClient.PostAsync($"/api/admin/alarms/{alarmId}/acknowledge", null, cancellationToken)).IsSuccessStatusCode; }
+        catch { return false; }
     }
 
     #endregion

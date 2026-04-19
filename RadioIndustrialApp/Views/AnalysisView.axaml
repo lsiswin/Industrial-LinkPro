@@ -1,10 +1,95 @@
-﻿<UserControl xmlns="https://github.com/avaloniaui"
+<UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-             mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
+             mc:Ignorable="d" d:DesignWidth="1200" d:DesignHeight="800"
              xmlns:vm="clr-namespace:RadioIndustrialApp.ViewModels"
+             x:DataType="vm:AnalysisViewModel"
+             xmlns:lvc="clr-namespace:LiveChartsCore.SkiaSharpView.Avalonia;assembly=LiveChartsCore.SkiaSharpView.Avalonia"
              x:Class="RadioIndustrialApp.Views.AnalysisView"
-             x:DataType="vm:AnalysisViewModel">
-    <TextBlock Text="{Binding Title}" HorizontalAlignment="Center"></TextBlock>
+             Background="#030712">
+
+    <UserControl.Styles>
+        <Style Selector="Border.card">
+            <Setter Property="Background" Value="#111827"/>
+            <Setter Property="CornerRadius" Value="8"/>
+            <Setter Property="BorderBrush" Value="#1F2937"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding" Value="20"/>
+        </Style>
+    </UserControl.Styles>
+
+    <Grid RowDefinitions="Auto, Auto, *" Margin="24">
+        <!-- Header -->
+        <Grid Grid.Row="0" ColumnDefinitions="*, Auto" Margin="0,0,0,24">
+            <StackPanel>
+                <TextBlock Text="{Binding Title}" Foreground="White" FontSize="24" FontWeight="Bold"/>
+                <TextBlock Text="基于历史采集数据的生产效能与能耗趋势分析" Foreground="#94A3B8" FontSize="14" Margin="0,4,0,0"/>
+            </StackPanel>
+            
+            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="16" VerticalAlignment="Center">
+                <ComboBox ItemsSource="{Binding Periods}" SelectedItem="{Binding SelectedPeriod}" Width="180" 
+                          Background="#1F2937" Foreground="White" BorderBrush="#374151"/>
+                
+                <Button Content="导出报告 ▼" Background="#2563EB" Foreground="White" Padding="16,8" CornerRadius="4">
+                    <Button.Flyout>
+                        <MenuFlyout Placement="BottomEdgeAlignedRight">
+                            <MenuItem Header="导出为 Excel (.xlsx)" Command="{Binding ExportReportCommand}" CommandParameter="Excel"/>
+                            <MenuItem Header="导出为 PDF (.pdf)" Command="{Binding ExportReportCommand}" CommandParameter="PDF"/>
+                            <MenuItem Header="导出为 CSV (.csv)" Command="{Binding ExportReportCommand}" CommandParameter="CSV"/>
+                        </MenuFlyout>
+                    </Button.Flyout>
+                </Button>
+            </StackPanel>
+        </Grid>
+
+        <!-- Stats Grid - 修复布局比例 -->
+        <ItemsControl Grid.Row="1" ItemsSource="{Binding Statistics}" Margin="0,0,0,24">
+            <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                    <UniformGrid Columns="4"/>
+                </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                    <Border Classes="card" Margin="0,0,12,0">
+                        <StackPanel>
+                            <TextBlock Text="{Binding Label}" Foreground="#94A3B8" FontSize="14"/>
+                            <TextBlock Text="{Binding Value}" Foreground="White" FontSize="28" FontWeight="Bold" Margin="0,12,0,0"/>
+                            <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                                <TextBlock Text="{Binding Trend}" Foreground="{Binding TrendColor}" FontSize="14" FontWeight="SemiBold"/>
+                                <TextBlock Text=" vs last period" Foreground="#64748B" FontSize="12" Margin="4,2,0,0"/>
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
+
+        <!-- Chart Area -->
+        <Border Grid.Row="2" Classes="card">
+            <Grid RowDefinitions="Auto, *">
+                <Grid ColumnDefinitions="*, Auto" Margin="0,0,0,20">
+                    <StackPanel Orientation="Horizontal" Spacing="24">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <Ellipse Width="12" Height="12" Fill="DodgerBlue"/>
+                            <TextBlock Text="生产效率 (%)" Foreground="#E2E8F0" FontSize="14"/>
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <Ellipse Width="12" Height="12" Fill="MediumSpringGreen"/>
+                            <TextBlock Text="能耗指标 (kW/h)" Foreground="#E2E8F0" FontSize="14"/>
+                        </StackPanel>
+                    </StackPanel>
+                    
+                    <ProgressBar Grid.Column="1" IsIndeterminate="True" IsVisible="{Binding IsBusy}" Width="100" Height="2" Foreground="#38BDF8"/>
+                </Grid>
+                
+                <lvc:CartesianChart Grid.Row="1" 
+                                    Series="{Binding Series}" 
+                                    XAxes="{Binding XAxes}" 
+                                    YAxes="{Binding YAxes}"
+                                    LegendPosition="Hidden"/>
+            </Grid>
+        </Border>
+    </Grid>
 </UserControl>

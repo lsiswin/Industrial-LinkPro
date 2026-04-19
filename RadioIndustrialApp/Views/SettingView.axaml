@@ -1,10 +1,149 @@
-﻿<UserControl xmlns="https://github.com/avaloniaui"
+<UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-             mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
+             mc:Ignorable="d" d:DesignWidth="1200" d:DesignHeight="800"
              xmlns:vm="clr-namespace:RadioIndustrialApp.ViewModels"
              x:DataType="vm:SettingViewModel"
-             x:Class="RadioIndustrialApp.Views.SettingView">
-    <TextBlock Text="{Binding Title}" HorizontalAlignment="Center"></TextBlock>
+             x:Class="RadioIndustrialApp.Views.SettingView"
+             Background="#030712">
+
+    <UserControl.Styles>
+        <Style Selector="Border.card">
+            <Setter Property="Background" Value="#111827"/>
+            <Setter Property="CornerRadius" Value="12"/>
+            <Setter Property="BorderBrush" Value="#1F2937"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding" Value="24"/>
+        </Style>
+        <Style Selector="ListBoxItem">
+            <Setter Property="Padding" Value="16,12"/>
+            <Setter Property="CornerRadius" Value="8"/>
+            <Setter Property="Margin" Value="0,2"/>
+        </Style>
+        <Style Selector="TextBlock.label">
+            <Setter Property="Foreground" Value="#94A3B8"/>
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="Margin" Value="0,0,0,8"/>
+        </Style>
+        <Style Selector="TextBox">
+            <Setter Property="Background" Value="#1F2937"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="BorderBrush" Value="#374151"/>
+        </Style>
+    </UserControl.Styles>
+
+    <Grid ColumnDefinitions="280, *">
+        <!-- Sidebar Navigation -->
+        <Border Grid.Column="0" Background="#0B0F19" BorderBrush="#1F2937" BorderThickness="0,0,1,0" Padding="16">
+            <StackPanel Spacing="10">
+                <TextBlock Text="系统配置" Foreground="White" FontSize="20" FontWeight="Bold" Margin="8,0,0,20"/>
+                
+                <ListBox ItemsSource="{Binding Categories}" SelectedItem="{Binding SelectedCategory}" Background="Transparent" BorderThickness="0">
+                    <ListBox.ItemTemplate>
+                        <DataTemplate>
+                            <StackPanel Orientation="Horizontal" Spacing="12">
+                                <TextBlock Text="{Binding Icon}" FontSize="18"/>
+                                <TextBlock Text="{Binding Name}" VerticalAlignment="Center" FontSize="15"/>
+                            </StackPanel>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+            </StackPanel>
+        </Border>
+
+        <!-- Right Content Area -->
+        <ScrollViewer Grid.Column="1" Padding="40">
+            <StackPanel Spacing="30" MaxWidth="800" HorizontalAlignment="Left">
+                
+                <!-- Category Title -->
+                <TextBlock Text="{Binding SelectedCategory.Name}" Foreground="White" FontSize="28" FontWeight="Bold"/>
+
+                <!-- Network Settings Section -->
+                <StackPanel IsVisible="{Binding SelectedCategory.Id, Converter={x:Static ObjectConverters.Equal}, ConverterParameter='Network'}" Spacing="24">
+                    <Border Classes="card">
+                        <StackPanel Spacing="20">
+                            <TextBlock Text="通讯链路配置" Foreground="#38BDF8" FontSize="18" FontWeight="SemiBold"/>
+                            
+                            <StackPanel>
+                                <TextBlock Text="OPC UA 服务器 URL" Classes="label"/>
+                                <Grid ColumnDefinitions="*, Auto">
+                                    <TextBox Text="{Binding OpcServerUrl}" Margin="0,0,12,0"/>
+                                    <Button Grid.Column="1" Content="测试连接" Command="{Binding TestOpcConnectionCommand}" Classes="accent"/>
+                                </Grid>
+                            </StackPanel>
+
+                            <StackPanel>
+                                <TextBlock Text="后端 API 基础地址" Classes="label"/>
+                                <TextBox Text="{Binding ApiBaseUrl}"/>
+                            </StackPanel>
+
+                            <StackPanel>
+                                <TextBlock Text="全局刷新频率 (ms)" Classes="label"/>
+                                <NumericUpDown Value="{Binding RefreshInterval}" Minimum="100" Maximum="60000" Increment="100"/>
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+                    <CheckBox IsChecked="{Binding EnableAutoReconnect}" Content="启用自动断线重连" Foreground="#E2E8F0"/>
+                </StackPanel>
+
+                <!-- User Settings Section -->
+                <StackPanel IsVisible="{Binding SelectedCategory.Id, Converter={x:Static ObjectConverters.Equal}, ConverterParameter='User'}" Spacing="24">
+                    <Border Classes="card">
+                        <StackPanel Spacing="20">
+                            <TextBlock Text="当前会话信息" Foreground="#38BDF8" FontSize="18" FontWeight="SemiBold"/>
+                            <Grid ColumnDefinitions="120, *" RowDefinitions="Auto, Auto">
+                                <TextBlock Text="登录账号:" Classes="label"/>
+                                <TextBlock Grid.Column="1" Text="{Binding CurrentUser}" Foreground="White" Margin="0,0,0,16"/>
+                                
+                                <TextBlock Grid.Row="1" Text="系统角色:" Classes="label"/>
+                                <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding UserRole}" Foreground="#10B981" FontWeight="Bold"/>
+                            </Grid>
+                        </StackPanel>
+                    </Border>
+                    <Button Content="修改密码" Background="#334155" Padding="20,10"/>
+                </StackPanel>
+
+                <!-- Storage Settings Section -->
+                <StackPanel IsVisible="{Binding SelectedCategory.Id, Converter={x:Static ObjectConverters.Equal}, ConverterParameter='Storage'}" Spacing="24">
+                    <Border Classes="card">
+                        <StackPanel Spacing="20">
+                            <TextBlock Text="历史数据管理" Foreground="#38BDF8" FontSize="18" FontWeight="SemiBold"/>
+                            <StackPanel>
+                                <TextBlock Text="日志保留天数" Classes="label"/>
+                                <NumericUpDown Value="{Binding LogRetentionDays}" Minimum="1" Maximum="365"/>
+                            </StackPanel>
+                            <CheckBox IsChecked="{Binding EnableLogging}" Content="启用系统运行日志记录" Foreground="#E2E8F0"/>
+                            <Button Content="立即清理历史数据" Background="#EF4444" Foreground="White" Margin="0,10,0,0"/>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+
+                <!-- About System Section -->
+                <StackPanel IsVisible="{Binding SelectedCategory.Id, Converter={x:Static ObjectConverters.Equal}, ConverterParameter='About'}" Spacing="24">
+                    <Border Classes="card">
+                        <StackPanel Spacing="16">
+                            <TextBlock Text="版本与环境" Foreground="#38BDF8" FontSize="18" FontWeight="SemiBold"/>
+                            <Grid ColumnDefinitions="150, *">
+                                <TextBlock Text="软件版本号:" Classes="label"/>
+                                <TextBlock Grid.Column="1" Text="{Binding SystemVersion}" Foreground="White"/>
+                            </Grid>
+                            <Grid ColumnDefinitions="150, *">
+                                <TextBlock Text="核心引擎:" Classes="label"/>
+                                <TextBlock Grid.Column="1" Text=".NET 10.0 Industrial Link Core" Foreground="White"/>
+                            </Grid>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+
+                <!-- Global Action Bar -->
+                <Separator Background="#1F2937" Margin="0,20"/>
+                <StackPanel Orientation="Horizontal" Spacing="16" HorizontalAlignment="Right">
+                    <Button Content="重置默认" Padding="24,12" Background="#334155"/>
+                    <Button Content="保存全部更改" Command="{Binding SaveSettingsCommand}" Padding="32,12" Background="#2563EB" Foreground="White" FontWeight="Bold"/>
+                </StackPanel>
+
+            </StackPanel>
+        </ScrollViewer>
+    </Grid>
 </UserControl>
