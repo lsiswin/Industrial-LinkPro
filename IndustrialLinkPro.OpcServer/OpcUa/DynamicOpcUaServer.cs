@@ -8,10 +8,16 @@ namespace IndustrialLinkPro.OpcServer.OpcUa;
 /// 标准 OPC UA 的内部承载服务器实例，它派生自 OPC 官方的 StandardServer
 /// 提供与应用程序本身对接的 MasterNodeManager 从而支撑对外服务的实际运行环境
 /// </summary>
-internal sealed class DynamicOpcUaServer(IRuntimeNodeRegistry registry, string namespaceUri) : StandardServer
+internal sealed class DynamicOpcUaServer(
+    IRuntimeNodeRegistry registry, 
+    string namespaceUri,
+    IndustrialLinkPro.OpcServer.Clients.DeviceApiClient? deviceApiClient = null,
+    ILogger<DynamicNodeManager>? logger = null) : StandardServer
 {
     private readonly IRuntimeNodeRegistry _registry = registry;
     private readonly string _namespaceUri = namespaceUri;
+    private readonly IndustrialLinkPro.OpcServer.Clients.DeviceApiClient? _deviceApiClient = deviceApiClient;
+    private readonly ILogger<DynamicNodeManager>? _logger = logger;
     
     // 保存其对应的动态节点管理器实例引用
     private DynamicNodeManager? _nodeManager;
@@ -24,7 +30,7 @@ internal sealed class DynamicOpcUaServer(IRuntimeNodeRegistry registry, string n
         ApplicationConfiguration configuration)
     {
         // 绑定自己体系里的节点管理器和内部运行时实例
-        _nodeManager = new DynamicNodeManager(server, configuration, _registry, _namespaceUri);
+        _nodeManager = new DynamicNodeManager(server, configuration, _registry, _namespaceUri, _deviceApiClient, _logger);
         return new MasterNodeManager(server, configuration, null, _nodeManager);
     }
 

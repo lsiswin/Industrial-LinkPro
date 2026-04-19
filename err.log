@@ -1,0 +1,8 @@
+d:\Cshrap\Industrial-LinkPro\Industrial-LinkPro\IndustrialLinkPro.OpcServer\OpcUa\OpcUaServerHost.cs(18,5): error CS0246: The type or namespace name 'DeviceApiClient' could not be found (are you missing a using directive or an assembly reference?) [d:\Cshrap\Industrial-LinkPro\Industrial-LinkPro\IndustrialLinkPro.OpcServer\IndustrialLinkPro.OpcServer.csproj]
+d:\Cshrap\Industrial-LinkPro\Industrial-LinkPro\IndustrialLinkPro.OpcServer\OpcUa\OpcUaServerHost.cs(25,22): error CS0246: The type or namespace name 'DeviceApiClient' could not be found (are you missing a using directive or an assembly reference?) [d:\Cshrap\Industrial-LinkPro\Industrial-LinkPro\IndustrialLinkPro.OpcServer\IndustrialLinkPro.OpcServer.csproj]
+
+Build FAILED.
+    0 Warning(s)
+    2 Error(s)
+
+Time Elapsed 00:00:04.07

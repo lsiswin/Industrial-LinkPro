@@ -40,13 +40,15 @@ public sealed class DefinitionSyncWorker(
             var result = runtimeModel.ApplyDefinitions(devices);
 
             logger.LogInformation(
-                "定义同步完成 (Definition sync completed). 设备数: {DeviceCount}, 点位数: {PointCount}, 拓扑是否改变: {TopologyChanged}",
+                "定义同步完成 (Definition sync completed). 设备数: {DeviceCount}, 点位数: {PointCount}, 设备拓扑是否改变: {DeviceTopologyChanged}, 点位是否改变: {PointsChanged}",
                 runtimeModel.GetDeviceRuntimes().Count,
                 runtimeModel.GetPointRuntimes().Count,
-                result.TopologyChanged);
+                result.DeviceTopologyChanged,
+                result.PointsChanged);
 
-            // 如果 OPC UA 地址空间的拓扑结构发生变化，通知 OPC UA 服务重建地址空间
-            if (result.TopologyChanged)
+            // 注意：当设备拓扑或者数据点位发生变化时，需要完全重建地址空间
+            // 重建后 DynamicNodeManager 内部会触发 NodeId 到 DeviceApi 的回写动作
+            if (result.DeviceTopologyChanged || result.PointsChanged)
             {
                 await opcUaServerHost.RebuildAddressSpaceAsync(cancellationToken);
             }

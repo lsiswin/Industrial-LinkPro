@@ -15,9 +15,14 @@ public interface IRuntimeNodeRegistry
     int DefaultScanIntervalMs { get; }
 
     /// <summary>
-    /// 点位值变化事件，通知 OPC UA 服务等订阅者更新节点数据
+    /// 点位值变化事件,通知 OPC UA 服务等订阅者更新节点数据
     /// </summary>
     event Action<PointRuntime>? PointValueChanged;
+    
+    /// <summary>
+    /// 新点位添加事件,通知 OPC UA 服务动态创建新的点位节点
+    /// </summary>
+    event Action<PointRuntime>? PointAdded;
 
     /// <summary>
     /// 应用从配置源读取的最新设备定义

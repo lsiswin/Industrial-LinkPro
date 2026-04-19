@@ -10,6 +10,7 @@ using LiveChartsCore.SkiaSharpView.Painting;
 using SkiaSharp;
 using Prism.Events;
 using Microsoft.Extensions.Configuration;
+using RadioIndustrialApp.Services;
 
 namespace RadioIndustrialApp.ViewModels;
 
@@ -17,6 +18,8 @@ public partial class IndexViewModel : ViewModelBase
 {
     private readonly IConfiguration _configuration;
     private readonly IEventAggregator _aggregator;
+    private readonly IHttpClientService _httpClientService;
+    private readonly IAuthService _authService;
 
     // ========== 数据集合 ==========
     public ObservableCollection<DeviceItem> Devices { get; set; } = new();
@@ -37,73 +40,103 @@ public partial class IndexViewModel : ViewModelBase
     [ObservableProperty] private int _onlineDevices = 0;
     [ObservableProperty] private int _errorDevices = 0;
     
-    [ObservableProperty] private int _opcNodeCount = 2458;
-    [ObservableProperty] private int _connectedClients = 4;
-    [ObservableProperty] private string _opcServiceStatus = "Active";
+    [ObservableProperty] private int _opcNodeCount = 0;
+    [ObservableProperty] private int _connectedClients = 0;
+    [ObservableProperty] private string _opcServiceStatus = "Unknown";
     
-    [ObservableProperty] private long _persistedDataCount = 3845012;
-    [ObservableProperty] private int _dataThroughput = 1250; // 条/秒
+    [ObservableProperty] private long _persistedDataCount = 0;
+    [ObservableProperty] private int _dataThroughput = 0; // 条/秒
 
     [ObservableProperty] private string _systemStatus = "系统运行正常";
     [ObservableProperty] private string _lastUpdateTime;
 
-    public IndexViewModel(IConfiguration configuration, IEventAggregator aggregator)
+    [ObservableProperty] private bool _isLoading;
+
+    public IndexViewModel(IConfiguration configuration, IEventAggregator aggregator, IHttpClientService httpClientService, IAuthService authService)
     {
         _configuration = configuration;
         _aggregator = aggregator;
+        _httpClientService = httpClientService;
+        _authService = authService;
         
         LastUpdateTime = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
         
         InitializeChart();
-        LoadMockData();
     }
 
     [RelayCommand]
     private async Task ConnectAllDevicesAsync()
     {
+        if (!await _authService.EnsureAccessAsync(AppRole.Admin))
+        {
+            AddLog("Error", "身份验证失败或权限不足，无法执行操作。");
+            return;
+        }
+
         SystemStatus = "正在初始化底层通讯链路...";
         AddLog("Info", "开始批量连接工业现场设备...");
-        await Task.Delay(1000); // 模拟耗时
+        await Task.Delay(1000); // Wait for connection simulation or API call
         foreach (var device in Devices.Where(d => d.Status != "RUN"))
         {
             device.Status = "RUN";
         }
-        UpdateStatistics();
+        UpdateLocalStatistics();
         SystemStatus = "所有设备已连接";
         AddLog("Success", "底层通讯链路建立完成。");
     }
 
     [RelayCommand]
-    private void RefreshDevices()
+    private async Task RefreshDevicesAsync()
     {
-        LoadMockData();
-        LastUpdateTime = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
-        AddLog("Info", "仪表盘数据已手动刷新。");
-    }
+        if (IsLoading) return;
+        IsLoading = true;
+        SystemStatus = "正在拉取最新数据...";
 
-    private void LoadMockData()
-    {
-        Devices.Clear();
-        var mockDevices = new[]
+        try
         {
-            new DeviceItem { Name = "Siemens S7-1500", IpAddress = "192.168.0.10", Detail = "主控 PLC / 产线A", Protocol = "S7 / OPC UA", Status = "RUN" },
-            new DeviceItem { Name = "ABB IRB 1200", IpAddress = "192.168.0.21", Detail = "上下料机器人", Protocol = "RobotStudio/OPC", Status = "RUN" },
-            new DeviceItem { Name = "HIKROBOT Camera", IpAddress = "192.168.0.35", Detail = "视觉缺陷检测", Protocol = "GigE / Halcon", Status = "RUN" },
-            new DeviceItem { Name = "冷链环境温湿度仪", IpAddress = "192.168.0.50", Detail = "环境监测节点", Protocol = "Modbus TCP", Status = "ERROR" },
-            new DeviceItem { Name = "OPC UA 边缘网关", IpAddress = "127.0.0.1", Detail = "本地数据汇聚中枢", Protocol = "OPC UA", Status = "RUN" }
-        };
+            // 1. 获取统计信息
+            var stats = await _httpClientService.GetDashboardStatsAsync();
+            TotalDevices = stats.TotalDevices;
+            OnlineDevices = stats.OnlineDevices;
+            ErrorDevices = stats.ErrorDevices;
+            OpcNodeCount = stats.OpcNodeCount;
+            ConnectedClients = stats.ConnectedClients;
+            PersistedDataCount = stats.PersistedDataCount;
+            DataThroughput = stats.DataThroughput;
 
-        foreach (var device in mockDevices) Devices.Add(device);
-        UpdateStatistics();
+            // 2. 获取设备列表
+            var deviceDtos = await _httpClientService.GetDevicesAsync();
+            Devices.Clear();
+            foreach (var dto in deviceDtos)
+            {
+                Devices.Add(new DeviceItem
+                {
+                    Name = dto.Name,
+                    IpAddress = "192.168.x.x", // or get from API if available
+                    Detail = dto.Description,
+                    Protocol = dto.Protocol,
+                    Status = dto.Status == "Active" ? "RUN" : dto.Status == "Error" ? "ERROR" : "OFFLINE"
+                });
+            }
 
-        SystemLogs.Clear();
-        AddLog("Info", "ColdDream 工业大屏已启动。");
-        AddLog("Info", "OPC UA Server (Port: 4840) 监听中...");
-        AddLog("Warning", "检测到冷链环境温湿度仪 (192.168.0.50) 通讯超时。");
+            LastUpdateTime = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
+            SystemStatus = "系统运行正常";
+            AddLog("Success", "仪表盘数据已拉取并刷新。");
+        }
+        catch (Exception ex)
+        {
+            SystemStatus = "数据拉取失败";
+            AddLog("Error", $"刷新仪表盘数据时发生异常: {ex.Message}");
+        }
+        finally
+        {
+            IsLoading = false;
+        }
     }
 
-    private void UpdateStatistics()
+    private void UpdateLocalStatistics()
     {
+        // Example local recalculation if local states mutate.
         TotalDevices = Devices.Count;
         OnlineDevices = Devices.Count(d => d.Status == "RUN");
         ErrorDevices = Devices.Count(d => d.Status == "ERROR");

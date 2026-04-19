@@ -155,3 +155,60 @@ public sealed class AuthResponse
     /// </summary>
     public DateTimeOffset ExpiresAtUtc { get; set; }
 }
+
+/// <summary>
+/// 批量更新NodeId请求
+/// </summary>
+public sealed class UpdateNodeIdRequest
+{
+    /// <summary>
+    /// 数据点ID
+    /// </summary>
+    public Guid DataPointId { get; set; }
+
+    /// <summary>
+    /// OPC UA NodeId
+    /// </summary>
+    public string NodeId { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Namespace Index
+    /// </summary>
+    public int? NamespaceIndex { get; set; }
+}
+
+/// <summary>
+/// 数据点NodeId响应
+/// </summary>
+public sealed class DataPointNodeIdResponse
+{
+    /// <summary>
+    /// 数据点ID
+    /// </summary>
+    public Guid Id { get; set; }
+
+    /// <summary>
+    /// 设备ID
+    /// </summary>
+    public Guid DeviceId { get; set; }
+
+    /// <summary>
+    /// 数据点名称
+    /// </summary>
+    public string Name { get; set; } = string.Empty;
+
+    /// <summary>
+    /// OPC UA NodeId
+    /// </summary>
+    public string? NodeId { get; set; }
+
+    /// <summary>
+    /// Namespace Index
+    /// </summary>
+    public int? NamespaceIndex { get; set; }
+
+    /// <summary>
+    /// 更新时间
+    /// </summary>
+    public DateTimeOffset UpdatedAtUtc { get; set; }
+}
