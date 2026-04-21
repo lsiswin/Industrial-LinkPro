@@ -15,41 +15,99 @@ public sealed class DeviceApiClient(HttpClient httpClient, IOptions<DeviceApiOpt
 
     private readonly DeviceApiOptions _options = options.Value;
 
-    public async Task<IReadOnlyCollection<DeviceDefinition>> GetDevicesAsync(CancellationToken cancellationToken)
+    private async Task<T?> ExecuteWithRetryAsync<T>(
+        Func<Task<T?>> action,
+        string actionName,
+        int maxRetries = 3
+    )
     {
-        var devices = await httpClient.GetFromJsonAsync<List<DeviceDefinition>>(
-            "/api/opc/devices",
-            JsonOptions,
-            cancellationToken);
-
-        return devices ?? [];
+        for (int i = 0; i < maxRetries; i++)
+        {
+            try
+            {
+                return await action();
+            }
+            catch (Exception ex)
+            {
+                if (i == maxRetries - 1)
+                {
+                    throw;
+                }
+                var delay = TimeSpan.FromSeconds(Math.Pow(2, i));
+                // 这里可以使用 logger 如果将其注入，但为了保持简洁我们直接等待
+                await Task.Delay(delay);
+            }
+        }
+        return default;
     }
 
-    public async Task<IReadOnlyCollection<DataPointDefinition>> GetDataPointsAsync(Guid deviceId, CancellationToken cancellationToken)
+    public async Task<IReadOnlyCollection<DeviceDefinition>> GetDevicesAsync(
+        CancellationToken cancellationToken
+    )
     {
-        var points = await httpClient.GetFromJsonAsync<List<DataPointDefinition>>(
-            $"/api/opc/devices/{deviceId}/datapoints",
-            JsonOptions,
-            cancellationToken);
+        return await ExecuteWithRetryAsync(
+                async () =>
+                {
+                    var devices = await httpClient.GetFromJsonAsync<List<DeviceDefinition>>(
+                        "/api/opc/devices",
+                        JsonOptions,
+                        cancellationToken
+                    );
 
-        return points ?? [];
+                    return (IReadOnlyCollection<DeviceDefinition>?)devices ?? [];
+                },
+                nameof(GetDevicesAsync)
+            ) ?? [];
+    }
+
+    public async Task<IReadOnlyCollection<DataPointDefinition>> GetDataPointsAsync(
+        Guid deviceId,
+        CancellationToken cancellationToken
+    )
+    {
+        return await ExecuteWithRetryAsync(
+                async () =>
+                {
+                    var points = await httpClient.GetFromJsonAsync<List<DataPointDefinition>>(
+                        $"/api/opc/devices/{deviceId}/datapoints",
+                        JsonOptions,
+                        cancellationToken
+                    );
+
+                    return (IReadOnlyCollection<DataPointDefinition>?)points ?? [];
+                },
+                nameof(GetDataPointsAsync)
+            ) ?? [];
     }
 
     public async Task<string?> LoginAsync(CancellationToken cancellationToken)
     {
-        if (string.IsNullOrWhiteSpace(_options.Auth.UserName) || string.IsNullOrWhiteSpace(_options.Auth.Password))
+        if (
+            string.IsNullOrWhiteSpace(_options.Auth.UserName)
+            || string.IsNullOrWhiteSpace(_options.Auth.Password)
+        )
         {
             return null;
         }
 
-        var response = await httpClient.PostAsJsonAsync(
-            "/api/auth/login",
-            new { userName = _options.Auth.UserName, password = _options.Auth.Password },
-            cancellationToken);
+        return await ExecuteWithRetryAsync(
+            async () =>
+            {
+                var response = await httpClient.PostAsJsonAsync(
+                    "/api/auth/login",
+                    new { userName = _options.Auth.UserName, password = _options.Auth.Password },
+                    cancellationToken
+                );
 
-        response.EnsureSuccessStatusCode();
-        var auth = await response.Content.ReadFromJsonAsync<AuthResponse>(JsonOptions, cancellationToken);
-        return auth?.AccessToken;
+                response.EnsureSuccessStatusCode();
+                var auth = await response.Content.ReadFromJsonAsync<AuthResponse>(
+                    JsonOptions,
+                    cancellationToken
+                );
+                return auth?.AccessToken;
+            },
+            nameof(LoginAsync)
+        );
     }
 
     /// <summary>
@@ -58,7 +116,8 @@ public sealed class DeviceApiClient(HttpClient httpClient, IOptions<DeviceApiOpt
     public async Task<bool> BatchUpdateNodeIdsAsync(
         IReadOnlyCollection<UpdateNodeIdRequest> requests,
         string? accessToken,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken
+    )
     {
         if (requests.Count == 0)
         {
@@ -69,7 +128,7 @@ public sealed class DeviceApiClient(HttpClient httpClient, IOptions<DeviceApiOpt
         {
             if (!string.IsNullOrWhiteSpace(accessToken))
             {
-                httpClient.DefaultRequestHeaders.Authorization = 
+                httpClient.DefaultRequestHeaders.Authorization =
                     new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", accessToken);
             }
 
@@ -77,7 +136,8 @@ public sealed class DeviceApiClient(HttpClient httpClient, IOptions<DeviceApiOpt
                 "/api/opc/datapoints/nodeid/batch",
                 requests,
                 JsonOptions,
-                cancellationToken);
+                cancellationToken
+            );
 
             return response.IsSuccessStatusCode;
         }
@@ -92,7 +152,8 @@ public sealed class DeviceApiClient(HttpClient httpClient, IOptions<DeviceApiOpt
     /// </summary>
     public async Task<IReadOnlyCollection<DataPointNodeIdResponse>> BatchGetNodeIdsAsync(
         IReadOnlyCollection<Guid> dataPointIds,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken
+    )
     {
         if (dataPointIds.Count == 0)
         {
@@ -105,12 +166,14 @@ public sealed class DeviceApiClient(HttpClient httpClient, IOptions<DeviceApiOpt
                 "/api/opc/datapoints/nodeid/batch-get",
                 new { dataPointIds },
                 JsonOptions,
-                cancellationToken);
+                cancellationToken
+            );
 
             if (response.IsSuccessStatusCode)
             {
-                var result = await response.Content.ReadFromJsonAsync<List<DataPointNodeIdResponse>>(
-                    JsonOptions, cancellationToken);
+                var result = await response.Content.ReadFromJsonAsync<
+                    List<DataPointNodeIdResponse>
+                >(JsonOptions, cancellationToken);
                 return result ?? [];
             }
 
@@ -119,6 +182,36 @@ public sealed class DeviceApiClient(HttpClient httpClient, IOptions<DeviceApiOpt
         catch
         {
             return [];
+        }
+    }
+
+    /// <summary>
+    /// 上报服务器整体汇总状态
+    /// </summary>
+    public async Task<bool> ReportServerStatusAsync(
+        ServerStatusRequest request,
+        string? accessToken,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            if (!string.IsNullOrWhiteSpace(accessToken))
+            {
+                httpClient.DefaultRequestHeaders.Authorization = 
+                    new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", accessToken);
+            }
+
+            var response = await httpClient.PostAsJsonAsync(
+                "/api/opc/server/status",
+                request,
+                JsonOptions,
+                cancellationToken);
+
+            return response.IsSuccessStatusCode;
+        }
+        catch
+        {
+            return false;
         }
     }
 }

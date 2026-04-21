@@ -24,6 +24,9 @@ internal sealed class DynamicNodeManager : CustomNodeManager2
     // 映射查找表：缓存着运行时点位 ID 以及其实际绑定分配在地址空间中的被动 OPC 变量状态
     private readonly Dictionary<Guid, BaseDataVariableState> _pointVariables = new();
 
+    // 缓存最后一次成功回写的 NodeId，防止重复提交
+    private readonly Dictionary<Guid, string> _lastWrittenNodeIds = new();
+
     /// <summary>
     /// 初始化动态节点管理器
     /// </summary>
@@ -125,87 +128,117 @@ internal sealed class DynamicNodeManager : CustomNodeManager2
             CreateProperty(metadataFolder, "Status", device.Status.ToString());
 
             // 逐个遍历挂载各下属的点位参数节点，并计入字典以备极速索引与赋值更新
-            foreach (var point in _registry.GetPointRuntimes().Where(x => x.DeviceId == device.DeviceId))
+            var points = _registry.GetPointDefinitions(device.DeviceId);
+            foreach (var pointDef in points)
             {
-                CreateVariable(dataPointsFolder, point);
+                var pointRuntime = _registry.GetPointRuntimes().FirstOrDefault(x => x.PointId == pointDef.Id);
+                if (pointRuntime != null)
+                {
+                    CreateVariable(dataPointsFolder, pointRuntime);
+
+                    // 【核心优化】如果 API 端已经有这个 NodeId，则预填充缓存，防止启动后的全量回写
+                    if (!string.IsNullOrEmpty(pointDef.NodeId) && !_lastWrittenNodeIds.ContainsKey(pointDef.Id))
+                    {
+                        _lastWrittenNodeIds[pointDef.Id] = pointDef.NodeId;
+                    }
+                }
             }
         }
 
         // 创建完节点后,异步更新 NodeId 到 DeviceApi
-        // ---------- 新增：异步回写 NodeId 到 DeviceApi ----------
-    if (_deviceApiClient is not null)
-    {
-        // 收集所有点位的 NodeId 信息，用于批量更新
-        var updateRequests = new List<UpdateNodeIdRequest>();
-        foreach (var kvp in _pointVariables)
+        // ---------- 优化：只回写发生变化的 NodeId ----------
+        if (_deviceApiClient is not null)
         {
-            var pointId = kvp.Key;
-            var variable = kvp.Value;
+            // 清理掉已经不存在的点位的缓存
+            var currentPointIds = _pointVariables.Keys.ToHashSet();
+            var cachedIdsToRemove = _lastWrittenNodeIds.Keys.Except(currentPointIds).ToList();
+            foreach (var id in cachedIdsToRemove) _lastWrittenNodeIds.Remove(id);
 
-            // 确保变量已经拥有有效的 NodeId
-            if (variable.NodeId != null && !variable.NodeId.IsNullNodeId)
+            // 收集只有 NodeId 发生变化的信息，用于批量更新
+            var updateRequests = new List<UpdateNodeIdRequest>();
+            foreach (var kvp in _pointVariables)
             {
-                updateRequests.Add(new UpdateNodeIdRequest
+                var pointId = kvp.Key;
+                var variable = kvp.Value;
+
+                if (variable.NodeId != null && !variable.NodeId.IsNullNodeId)
                 {
-                    DataPointId = pointId,
-                    NodeId = variable.NodeId.ToString(),
-                    NamespaceIndex = variable.NodeId.NamespaceIndex
-                });
+                    var currentNodeIdStr = variable.NodeId.ToString();
+                    
+                    // 检查是否与上次成功回写的一致
+                    if (!_lastWrittenNodeIds.TryGetValue(pointId, out var lastNodeId) || lastNodeId != currentNodeIdStr)
+                    {
+                        updateRequests.Add(new UpdateNodeIdRequest
+                        {
+                            DataPointId = pointId,
+                            NodeId = currentNodeIdStr,
+                            NamespaceIndex = variable.NodeId.NamespaceIndex
+                        });
+                    }
+                }
             }
-        }
 
-        if (updateRequests.Count > 0)
-        {
-            // 采用即发即忘的方式异步发送，不阻塞当前重建过程
-            _ = Task.Run(async () =>
+            if (updateRequests.Count > 0)
             {
-                try
+                _logger?.LogInformation("检测到 {Count} 个点位的 NodeId 需要回写至 DeviceApi", updateRequests.Count);
+
+                // 采用即发即忘的方式异步发送，不阻塞当前重建过程
+                _ = Task.Run(async () =>
                 {
-                    // 获取访问令牌（如果配置了认证）
-                    string? accessToken = null;
                     try
                     {
-                        // 使用一个短暂的超时，避免长期阻塞
-                        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-                        accessToken = await _deviceApiClient.LoginAsync(cts.Token).ConfigureAwait(false);
+                        // 获取访问令牌（如果配置了认证）
+                        string? accessToken = null;
+                        try
+                        {
+                            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+                            accessToken = await _deviceApiClient.LoginAsync(cts.Token).ConfigureAwait(false);
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger?.LogWarning(ex, "登录 DeviceApi 失败，将尝试无认证方式更新 NodeId");
+                        }
+
+                        // 执行批量更新
+                        using var ctstoken = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+                        var success = await _deviceApiClient.BatchUpdateNodeIdsAsync(
+                            updateRequests,
+                            accessToken,
+                            ctstoken.Token).ConfigureAwait(false);
+
+                        if (success)
+                        {
+                            _logger?.LogInformation("成功向 DeviceApi 回写了 {Count} 个数据点的 NodeId", updateRequests.Count);
+                            
+                            // 更新本地成功回写的缓存
+                            lock (_syncRoot)
+                            {
+                                foreach (var req in updateRequests)
+                                {
+                                    _lastWrittenNodeIds[req.DataPointId] = req.NodeId;
+                                }
+                            }
+                        }
+                        else
+                        {
+                            _logger?.LogWarning("向 DeviceApi 回写 NodeId 失败，请检查网络或 API 状态");
+                        }
                     }
                     catch (Exception ex)
                     {
-                        _logger?.LogWarning(ex, "登录 DeviceApi 失败，将尝试无认证方式更新 NodeId");
+                        _logger?.LogError(ex, "异步更新 NodeId 至 DeviceApi 时发生异常");
                     }
-
-                    // 执行批量更新
-                    using var ctstoken = new CancellationTokenSource(TimeSpan.FromSeconds(30));
-                    var success = await _deviceApiClient.BatchUpdateNodeIdsAsync(
-                        updateRequests,
-                        accessToken,
-                        ctstoken.Token).ConfigureAwait(false);
-
-                    if (success)
-                    {
-                        _logger?.LogInformation("成功向 DeviceApi 回写了 {Count} 个数据点的 NodeId", updateRequests.Count);
-                    }
-                    else
-                    {
-                        _logger?.LogWarning("向 DeviceApi 回写 NodeId 失败，请检查网络或 API 状态");
-                    }
-                }
-                catch (Exception ex)
-                {
-                    _logger?.LogError(ex, "异步更新 NodeId 至 DeviceApi 时发生异常");
-                }
-            });
+                });
+            }
+            else
+            {
+                _logger?.LogInformation("当前地址空间拓扑未发生 NodeId 变更，跳过回写动作");
+            }
         }
         else
         {
-            _logger?.LogDebug("当前地址空间中无任何点位需要回写 NodeId");
+            _logger?.LogWarning("DeviceApiClient 未注入，NodeId 回写功能被跳过");
         }
-    }
-    else
-    {
-        _logger?.LogWarning("DeviceApiClient 未注入，NodeId 回写功能被跳过");
-    }
-
     }
 
     /// <summary>

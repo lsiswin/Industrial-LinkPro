@@ -138,6 +138,16 @@ public sealed class DataPointDefinition
     /// 点位配置信息的最新修改时间，用于增量判定
     /// </summary>
     public DateTimeOffset UpdatedAtUtc { get; set; }
+
+    /// <summary>
+    /// 该点位在 OPC UA 中的 NodeId (如果 API 已经记录)
+    /// </summary>
+    public string? NodeId { get; set; }
+
+    /// <summary>
+    /// 该点位在 OPC UA 中的 NamespaceIndex (如果 API 已经记录)
+    /// </summary>
+    public int? NamespaceIndex { get; set; }
 }
 
 /// <summary>
@@ -211,4 +221,45 @@ public sealed class DataPointNodeIdResponse
     /// 更新时间
     /// </summary>
     public DateTimeOffset UpdatedAtUtc { get; set; }
+}
+
+/// <summary>
+/// 服务器运行状态上报请求模型
+/// </summary>
+public sealed class ServerStatusRequest
+{
+    /// <summary>
+    /// 服务器标识名
+    /// </summary>
+    public string ServerName { get; set; } = string.Empty;
+
+    /// <summary>
+    /// 总设备数
+    /// </summary>
+    public int TotalDevices { get; set; }
+
+    /// <summary>
+    /// 在线设备数
+    /// </summary>
+    public int OnlineDevices { get; set; }
+
+    /// <summary>
+    /// 故障设备数
+    /// </summary>
+    public int FaultDevices { get; set; }
+
+    /// <summary>
+    /// 总点位数
+    /// </summary>
+    public int TotalPoints { get; set; }
+
+    /// <summary>
+    /// 引擎是否正常运行
+    /// </summary>
+    public bool IsEngineRunning { get; set; }
+
+    /// <summary>
+    /// 上报时间戳
+    /// </summary>
+    public DateTimeOffset Timestamp { get; set; }
 }

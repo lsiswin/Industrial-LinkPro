@@ -18,18 +18,38 @@ public sealed class DefinitionSyncWorker(
     {
         logger.LogInformation("IndustrialLinkPro 定义同步服务启动 (Definition Sync Worker starting).");
 
+        // 启动时持续尝试同步，直到成功获取到定义，实现自动重连逻辑
+        bool firstSyncSuccess = false;
+        while (!firstSyncSuccess && !stoppingToken.IsCancellationRequested)
+        {
+            firstSyncSuccess = await SyncDefinitionsOnceAsync(stoppingToken);
+            
+            if (!firstSyncSuccess)
+            {
+                const int retryDelaySeconds = 5;
+                logger.LogWarning("初始定义同步失败，将在 {Seconds} 秒后重试... (Initial sync failed, retrying in {Seconds}s...)", retryDelaySeconds, retryDelaySeconds);
+                try
+                {
+                    await Task.Delay(TimeSpan.FromSeconds(retryDelaySeconds), stoppingToken);
+                }
+                catch (OperationCanceledException)
+                {
+                    break;
+                }
+            }
+        }
+
+        if (stoppingToken.IsCancellationRequested) return;
+
         using var timer = new PeriodicTimer(TimeSpan.FromSeconds(runtimeModel.SyncIntervalSeconds));
         
-        // 启动时先执行一次同步
-        await SyncDefinitionsOnceAsync(stoppingToken);
-
         while (await timer.WaitForNextTickAsync(stoppingToken))
         {
             await SyncDefinitionsOnceAsync(stoppingToken);
         }
     }
 
-    private async Task SyncDefinitionsOnceAsync(CancellationToken cancellationToken)
+    private async Task<bool> SyncDefinitionsOnceAsync(CancellationToken cancellationToken)
     {
         try
         {
@@ -47,15 +67,17 @@ public sealed class DefinitionSyncWorker(
                 result.PointsChanged);
 
             // 注意：当设备拓扑或者数据点位发生变化时，需要完全重建地址空间
-            // 重建后 DynamicNodeManager 内部会触发 NodeId 到 DeviceApi 的回写动作
             if (result.DeviceTopologyChanged || result.PointsChanged)
             {
                 await opcUaServerHost.RebuildAddressSpaceAsync(cancellationToken);
             }
+
+            return true;
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "定义同步失败 (Definition sync failed).");
+            logger.LogError(ex, "定义同步失败 (Definition sync failed). 请检查 API 服务状态及其网络连接。");
+            return false;
         }
     }
 }

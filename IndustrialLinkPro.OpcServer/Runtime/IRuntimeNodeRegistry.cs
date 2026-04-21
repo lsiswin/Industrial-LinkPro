@@ -18,7 +18,7 @@ public interface IRuntimeNodeRegistry
     /// 点位值变化事件,通知 OPC UA 服务等订阅者更新节点数据
     /// </summary>
     event Action<PointRuntime>? PointValueChanged;
-    
+
     /// <summary>
     /// 新点位添加事件,通知 OPC UA 服务动态创建新的点位节点
     /// </summary>
@@ -47,7 +47,12 @@ public interface IRuntimeNodeRegistry
     /// <summary>
     /// 更新点位值并触发事件
     /// </summary>
-    void UpdatePointValue(Guid deviceId, Guid pointId, object? value, string quality);
+    public (bool IsSuccess, bool IsChanged, object? OldValue) UpdatePointValue(
+        Guid deviceId,
+        Guid pointId,
+        object? value,
+        string quality
+    );
 
     /// <summary>
     /// 标识设备在线，并清除错误状态

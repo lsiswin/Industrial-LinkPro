@@ -38,9 +38,10 @@ builder.Services.AddSingleton<IOpcUaServerHost, OpcUaServerHost>();
 
 // 注册 OPC UA 主宿主服务（先于后台工作服务启动）
 builder.Services.AddHostedService(sp => (OpcUaServerHost)sp.GetRequiredService<IOpcUaServerHost>());
-// 注册拆分后的两项工作服务：定义同步采集与数据采集
+// 注册拆分后的三项工作服务：定义同步采集、数据采集与状态上报
 builder.Services.AddHostedService<DefinitionSyncWorker>();
 builder.Services.AddHostedService<DataAcquisitionWorker>();
+builder.Services.AddHostedService<StatusReportingWorker>();
 
 var host = builder.Build();
 host.Run();

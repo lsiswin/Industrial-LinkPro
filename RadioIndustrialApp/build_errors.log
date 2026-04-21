@@ -1,7 +1,8 @@
-﻿d:\Cshrap\Industrial-LinkPro\Industrial-LinkPro\RadioIndustrialApp\ViewModels\DeviceViewModel.cs(86,56): error CS0103: 褰撳墠涓婁笅鏂囦腑涓嶅瓨鍦ㄥ悕绉扳€淐onnectionStatus鈥?[d:\Cshrap\Industrial-LinkPro\Industrial-LinkPro\RadioIndustrialApp\RadioIndustrialApp.csproj]
+﻿C:\Program Files\dotnet\sdk\10.0.300-preview.0.26177.108\Microsoft.Common.CurrentVersion.targets(5096,5): error MSB3027: 鏃犳硶灏嗏€渄:\Cshrap\Industrial-LinkPro\Industrial-LinkPro\IndustrialLinkPro.OpcClient\bin\Debug\net10.0\IndustrialLinkPro.OpcClient.dll鈥濆鍒跺埌鈥渂in\Debug\net10.0\IndustrialLinkPro.OpcClient.dll鈥濄€傝秴鍑轰簡閲嶈瘯璁℃暟 10銆傚け璐ャ€傛枃浠惰鈥淩adioIndustrialApp (30304)鈥濋攣瀹氥€?[d:\Cshrap\Industrial-LinkPro\Industrial-LinkPro\RadioIndustrialApp\RadioIndustrialApp.csproj]
+C:\Program Files\dotnet\sdk\10.0.300-preview.0.26177.108\Microsoft.Common.CurrentVersion.targets(5096,5): error MSB3021: 鏃犳硶灏嗘枃浠垛€渄:\Cshrap\Industrial-LinkPro\Industrial-LinkPro\IndustrialLinkPro.OpcClient\bin\Debug\net10.0\IndustrialLinkPro.OpcClient.dll鈥濆鍒跺埌鈥渂in\Debug\net10.0\IndustrialLinkPro.OpcClient.dll鈥濄€俆he process cannot access the file 'd:\Cshrap\Industrial-LinkPro\Industrial-LinkPro\RadioIndustrialApp\bin\Debug\net10.0\IndustrialLinkPro.OpcClient.dll' because it is being used by another process. [d:\Cshrap\Industrial-LinkPro\Industrial-LinkPro\RadioIndustrialApp\RadioIndustrialApp.csproj]
 
 鐢熸垚澶辫触銆?
-    11 涓鍛?
-    1 涓敊璇?
+    10 涓鍛?
+    2 涓敊璇?
 
-宸茬敤鏃堕棿 00:00:04.30
+宸茬敤鏃堕棿 00:00:16.94

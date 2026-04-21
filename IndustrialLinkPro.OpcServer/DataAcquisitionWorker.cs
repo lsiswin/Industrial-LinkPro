@@ -49,18 +49,44 @@ public sealed class DataAcquisitionWorker(
                     foreach (var entry in values)
                     {
                         // 更新点位值，内部将触发 PointValueChanged 事件以推送给 OPC UA
-                        runtimeModel.UpdatePointValue(
+                        var result = runtimeModel.UpdatePointValue(
                             device.DeviceId,
                             entry.Key,
                             entry.Value,
                             "Good"
                         );
-                        logger.LogInformation(
-                            "成功采集数据 (Data acquired) for device {DeviceId}, point {PointId}: {Value}",
-                            device.DeviceId,
-                            entry.Key,
-                            entry.Value
-                        );
+                        if (result.IsSuccess)
+                        {
+                            if (result.IsChanged)
+                            {
+                                // 数据变化时，打印明显的变更日志
+                                logger.LogInformation(
+                                    "点位数据已更新 (Data changed) for device {DeviceId}, point {PointId}: [ {OldValue} ] -> [ {NewValue} ]",
+                                    device.DeviceId,
+                                    entry.Key,
+                                    result.OldValue ?? "NULL",
+                                    entry.Value ?? "NULL"
+                                );
+                            }
+                            else
+                            {
+                                // 数据未变化时，降级为 Debug 日志，防止刷屏影响排错
+                                logger.LogDebug(
+                                    "采集成功但数据未变 (Data unchanged) for device {DeviceId}, point {PointId}: {Value}",
+                                    device.DeviceId,
+                                    entry.Key,
+                                    entry.Value
+                                );
+                            }
+                        }
+                        else
+                        {
+                            logger.LogWarning(
+                                "尝试更新不存在的点位 (Point not found): {PointId} on device {DeviceId}",
+                                entry.Key,
+                                device.DeviceId
+                            );
+                        }
                     }
                 }
                 catch (OperationCanceledException)

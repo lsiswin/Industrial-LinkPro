@@ -25,6 +25,7 @@ public class OpcClientService : BackgroundService
     private ApplicationConfiguration? _appConfig;
     private ConnectionStatus _currentStatus = ConnectionStatus.Disconnected;
     private readonly ConcurrentDictionary<string, MonitoredItem> _monitoredItems = new();
+    private readonly HashSet<string> _activeNodeIds = new();
     private readonly List<Subscription> _subscriptions = new();
     private readonly object _lock = new();
 
@@ -183,6 +184,7 @@ public class OpcClientService : BackgroundService
         
         _subscriptions.Clear();
         _monitoredItems.Clear();
+        _activeNodeIds.Clear();
         
         _logger.LogInformation("订阅清理完成");
     }
@@ -211,6 +213,14 @@ public class OpcClientService : BackgroundService
 
         var nodeIdList = nodeIds.ToList();
         _logger.LogInformation("正在订阅 {Count} 个数据点", nodeIdList.Count);
+
+        lock (_activeNodeIds)
+        {
+            foreach (var id in nodeIdList)
+            {
+                _activeNodeIds.Add(id);
+            }
+        }
 
         var subscription = new Subscription(_session.DefaultSubscription)
         {
@@ -249,6 +259,11 @@ public class OpcClientService : BackgroundService
                     break;
                 }
             }
+        }
+
+        lock (_activeNodeIds)
+        {
+            _activeNodeIds.Remove(nodeId);
         }
 
         _dataCache.Remove(nodeId);
@@ -472,6 +487,25 @@ public class OpcClientService : BackgroundService
             try
             {
                 await ConnectAsync(stoppingToken);
+
+                // 如果存在之前订阅的节点，在重连成功后立刻恢复订阅
+                List<string> nodesToResubscribe;
+                lock (_activeNodeIds)
+                {
+                    nodesToResubscribe = _activeNodeIds.ToList();
+                }
+                if (nodesToResubscribe.Any())
+                {
+                    _logger.LogInformation("检测到历史订阅节点，正在尝试自动恢复订阅...");
+                    try
+                    {
+                        await SubscribeToNodesAsync(nodesToResubscribe, stoppingToken);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(ex, "自动恢复订阅失败，系统将于下一轮继续重试...");
+                    }
+                }
 
                 // 等待会话关闭
                 await WaitForSessionClose(stoppingToken);

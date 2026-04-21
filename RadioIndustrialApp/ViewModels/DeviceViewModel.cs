@@ -6,9 +6,11 @@ using System.Threading.Tasks;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using CommunityToolkit.Mvvm.Messaging;
 using IndustrialLinkPro.OpcClient.Events;
 using IndustrialLinkPro.OpcClient.Models;
 using IndustrialLinkPro.OpcClient.Services;
+using RadioIndustrialApp.Models;
 using RadioIndustrialApp.Services;
 
 namespace RadioIndustrialApp.ViewModels;
@@ -40,7 +42,8 @@ public partial class DeviceViewModel : ViewModelBase, IDisposable
     [RelayCommand]
     private async Task LoadDataAsync(object? parameter)
     {
-        if (IsLoading) return;
+        if (IsLoading)
+            return;
 
         // 解析参数：支持 bool 类型或字符串 "True"/"False"
         bool forceLoad = false;
@@ -58,19 +61,21 @@ public partial class DeviceViewModel : ViewModelBase, IDisposable
         {
             return;
         }
-        
+
         IsLoading = true;
 
         try
         {
             // 在后台线程执行繁重的数据拉取和处理
-            await Task.Run(async () => {
+            await Task.Run(async () =>
+            {
                 var devicesDto = await _httpClientService.GetDevicesAsync();
                 var allNodeIds = new List<string>();
                 var tempDeviceList = new List<DeviceItemViewModel>();
 
                 // 使用并发请求获取所有设备的点位
-                var tasks = devicesDto.Select(async dto => {
+                var tasks = devicesDto.Select(async dto =>
+                {
                     var deviceVm = new DeviceItemViewModel
                     {
                         Id = dto.Id,
@@ -88,6 +93,7 @@ public partial class DeviceViewModel : ViewModelBase, IDisposable
                             Name = p.Name,
                             NodeId = p.NodeId,
                             Unit = p.Unit,
+                            AlarmThreshold = p.AlarmThreshold,
                             Value = "Waiting...",
                         };
                         deviceVm.DataPoints.Add(dpVm);
@@ -106,10 +112,12 @@ public partial class DeviceViewModel : ViewModelBase, IDisposable
                 var results = await Task.WhenAll(tasks);
 
                 // 回到 UI 线程更新集合
-                await Dispatcher.UIThread.InvokeAsync(() => {
+                await Dispatcher.UIThread.InvokeAsync(() =>
+                {
                     Devices.Clear();
-                    foreach (var res in results) Devices.Add(res);
-                    
+                    foreach (var res in results)
+                        Devices.Add(res);
+
                     if (Devices.Any())
                         SelectedDevice = Devices.First();
                 });
@@ -141,7 +149,7 @@ public partial class DeviceViewModel : ViewModelBase, IDisposable
 
     private void OnOpcDataChanged(object? sender, DataChangedEventArgs e)
     {
-        Dispatcher.UIThread.InvokeAsync(() =>
+        Dispatcher.UIThread.InvokeAsync(async () =>
         {
             foreach (var device in Devices)
             {
@@ -149,6 +157,28 @@ public partial class DeviceViewModel : ViewModelBase, IDisposable
                 if (pt != null)
                 {
                     pt.Value = e.DataPoint.Value?.ToString() ?? "N/A";
+
+                    // 自动报警阈值检测
+                    if (pt.AlarmThreshold.HasValue && double.TryParse(pt.Value, out var val))
+                    {
+                        if (val > pt.AlarmThreshold.Value && !pt.IsAlarmActive)
+                        {
+                            pt.IsAlarmActive = true;
+                            var alarmRequest = new Models.CreateAlarmRequest(
+                                Source: $"{device.Name} - {pt.Name}",
+                                Message: $"检测到数据越界! 当前值: {val}，超过设定的阈值: {pt.AlarmThreshold}",
+                                Severity: Models.AlarmSeverity.Warning
+                            );
+                            var alarmItem = await _httpClientService.CreateAlarmAsync(alarmRequest);
+                                WeakReferenceMessenger.Default.Send(
+                                new NewAlarmsMessage { AlarmItem = alarmItem }
+                                );
+                            }
+                        else if (val <= pt.AlarmThreshold.Value && pt.IsAlarmActive)
+                        {
+                            pt.IsAlarmActive = false; // 重置告警状态
+                        }
+                    }
                     break;
                 }
             }
@@ -187,6 +217,9 @@ public partial class DataPointItemViewModel : ObservableObject
 
     [ObservableProperty]
     private string unit = string.Empty;
+
+    public double? AlarmThreshold { get; set; }
+    public bool IsAlarmActive { get; set; } = false;
 
     [ObservableProperty]
     private string value = "0";
